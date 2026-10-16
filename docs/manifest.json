@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.1.0.0",
-        "changelog": "首个可安装版本：.strm 复用同级 .trickplay 瓦片，播放时显示进度条预览",
+        "changelog": "feat(ci): push 新版本自动发 Release 并附 zip + md5/sha256 校验文件；docs 清单同步",
         "targetAbi": "12.2.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/strm-trickplay_0.1.0.0.zip",
-        "checksum": "7B45F460E47D0BAE03101303C1F20809",
-        "timestamp": "2026-10-16T20:56:42.4265660Z",
+        "checksum": "1A7509B90D875442635B2D3D991D8D75",
+        "timestamp": "2026-10-16T20:57:34.6932810Z",
         "repositoryName": "STRM Trickplay",
         "repositoryUrl": "https://github.com/tang-bai/strm-trickplay"
       }
