@@ -83,6 +83,11 @@ public sealed class StrmTrickplayController : ControllerBase
             verboseLogging = config.VerboseLogging,
             cachedItems = _index.CachedItemCount,
             trickplayManagerType = typeof(Trickplay.StrmTrickplayManager).FullName,
+            fastStartup = new
+            {
+                enabled = config.EnableFastStartup,
+                description = "媒体信息已完整的 .strm 在起播时跳过核心强制的远端探测"
+            },
             mediaProbe = new
             {
                 enabled = config.EnableMediaProbe,

@@ -1,4 +1,5 @@
 using Jellyfin.Plugin.StrmTrickplay.Configuration;
+using Jellyfin.Plugin.StrmTrickplay.Playback;
 using Jellyfin.Plugin.StrmTrickplay.Probe;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
@@ -174,6 +175,32 @@ var strmComplete = new Movie
 };
 streamMap[strmComplete.Id] = [new MediaStream { Type = MediaStreamType.Video, Codec = "hevc" }];
 Check("strm 有媒体流且有时长 => 不探测", !probeService.NeedsProbe(strmComplete), "false");
+
+Console.WriteLine("\n=== 用例 11：起播加速判定（PlaybackProbePolicy） ===");
+var videoStreams = new List<MediaStream> { new MediaStream { Type = MediaStreamType.Video, Codec = "h264" } };
+var emptyStreams = new List<MediaStream>();
+
+var fastStrm = new Movie
+{
+    Id = Guid.NewGuid(),
+    Path = Path.Combine(root, "fast-a.strm"),
+    IsShortcut = true,
+    RunTimeTicks = TimeSpan.FromMinutes(90).Ticks
+};
+Check("strm 有视频流且有时长 => 跳过起播探测", PlaybackProbePolicy.ShouldSkipProbe(fastStrm, videoStreams, true), "true");
+Check("插件开关关闭 => 不跳过", !PlaybackProbePolicy.ShouldSkipProbe(fastStrm, videoStreams, false), "false");
+
+var fastStrmNoRuntime = new Movie { Id = Guid.NewGuid(), Path = Path.Combine(root, "fast-b.strm"), IsShortcut = true };
+Check("无时长 => 不跳过（仍需探测）", !PlaybackProbePolicy.ShouldSkipProbe(fastStrmNoRuntime, videoStreams, true), "false");
+Check("无媒体流 => 不跳过", !PlaybackProbePolicy.ShouldSkipProbe(fastStrm, emptyStreams, true), "false");
+
+var localFile = new Movie
+{
+    Id = Guid.NewGuid(),
+    Path = Path.Combine(root, "fast-c.mkv"),
+    RunTimeTicks = TimeSpan.FromMinutes(90).Ticks
+};
+Check("非 strm 本地文件 => 不介入", !PlaybackProbePolicy.ShouldSkipProbe(localFile, videoStreams, true), "false");
 
 Console.WriteLine();
 if (failures.Count == 0)

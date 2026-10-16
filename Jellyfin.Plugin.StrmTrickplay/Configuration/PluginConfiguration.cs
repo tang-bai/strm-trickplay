@@ -105,4 +105,12 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the library names to probe. Empty means all libraries.
     /// </summary>
     public string[] ProbeLibraryNames { get; set; } = [];
+
+    // —————— 起播加速 ——————
+
+    /// <summary>
+    /// Gets or sets a value indicating whether .strm items whose media info is already complete skip the
+    /// playback-time remote probe that Jellyfin forces for every strm item.
+    /// </summary>
+    public bool EnableFastStartup { get; set; } = true;
 }

@@ -1,13 +1,13 @@
 {
   "name": "STRM Trickplay",
   "guid": "3f9a7c14-5b62-4d8e-9a10-7c6e2f5b8d31",
-  "version": "0.2.0.0",
+  "version": "0.3.0.0",
   "targetAbi": "12.2.0.0",
   "framework": "net10.0",
   "category": "General",
   "owner": "",
-  "overview": "为 .strm 条目提供 trickplay 进度条预览（复用同级目录下已生成的瓦片），并可为 .strm 探测补齐时长 / 编码 / 分辨率等媒体信息",
-  "description": "① 让 Jellyfin 中的 .strm 条目复用媒体目录下已经生成好的 .trickplay 瓦片目录，在播放时显示进度条缩略图预览（目录规范与 Jellyfin 原生 SaveTrickplayWithMedia 一致：<文件名>.trickplay/<宽> - <瓦片宽>x<瓦片高>/<序号>.jpg）；② 为 .strm 条目执行远端 ffprobe，补齐时长 / 编码 / 分辨率 / 音轨（Jellyfin 默认跳过 .strm 的库扫描探测），并可随库扫描自动探测新增条目。",
+  "overview": "为 .strm 条目提供 trickplay 进度条预览（复用同级目录下已生成的瓦片）、探测补齐时长/编码/分辨率等媒体信息，并加速起播（跳过点播时重复的远端探测）",
+  "description": "① 让 Jellyfin 中的 .strm 条目复用媒体目录下已经生成好的 .trickplay 瓦片目录，在播放时显示进度条缩略图预览（目录规范与 Jellyfin 原生 SaveTrickplayWithMedia 一致：<文件名>.trickplay/<宽> - <瓦片宽>x<瓦片高>/<序号>.jpg）；② 为 .strm 条目执行远端 ffprobe，补齐时长 / 编码 / 分辨率 / 音轨（Jellyfin 默认跳过 .strm 的库扫描探测），并可随库扫描自动探测新增条目；③ 起播加速：媒体信息已完整的 .strm 在点播时跳过 Jellyfin 核心强制的重复远端探测（按路径后缀无条件触发的那次 ffprobe）。",
   "imageUrl": "",
   "artifacts": [
     "Jellyfin.Plugin.StrmTrickplay.dll"

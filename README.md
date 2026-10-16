@@ -5,8 +5,8 @@
 | 项目 | 值 |
 |---|---|
 | 适配 | **Jellyfin 12.2**（targetAbi `12.2.0.0`，net10.0） |
-| 当前版本 | 0.2.0.0 |
-| 能力 | ① .strm 复用同级 `.trickplay` 瓦片 → 进度条预览；② 为 .strm 探测补齐时长 / 编码 / 分辨率 |
+| 当前版本 | 0.3.0.0 |
+| 能力 | ① .strm 复用同级 `.trickplay` 瓦片 → 进度条预览；② 为 .strm 探测补齐时长 / 编码 / 分辨率；③ 起播加速（跳过核心每次点播强制的重复探测） |
 | 存储库地址 | `https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/manifest.json` |
 | 状态 | 已在真实 **Jellyfin 12.2.0** 服务端实测通过（见 [TEST-REPORT.md](TEST-REPORT.md)） |
 
@@ -310,7 +310,55 @@ curl -X POST "http://<服务器>:8096/Plugins/StrmTrickplay/Probe/Item/<32位ite
 
 ---
 
-## 5. 配置项（控制台 → 插件 → STRM Trickplay）
+## 5. 起播加速（跳过重复的远端探测）
+
+### 为什么 .strm 起播慢
+
+Jellyfin 12.2 的 `MediaSourceManager.GetPlaybackMediaSources` 里有一段：
+
+```csharp
+// If file is strm or main media stream is missing, force a metadata refresh with remote probing
+if (allowMediaProbe && ... && (item.Path.EndsWith(".strm", StringComparison.OrdinalIgnoreCase)
+    || (item.MediaType == MediaType.Video && mediaSources[0].MediaStreams.All(i => i.Type != MediaStreamType.Video))
+    || ...))
+{
+    await item.RefreshMetadata(new MetadataRefreshOptions(_directoryService)
+    {
+        EnableRemoteContentProbe = true,
+        MetadataRefreshMode = MetadataRefreshMode.FullRefresh
+    }, ...);
+}
+```
+
+注意第一行判断的是**路径后缀**，不是"是否缺少媒体信息"。而 `FFProbeVideoInfo.ProbeVideo` 只要
+`EnableRemoteContentProbe` 为真就会去跑 ffprobe（没有"已有信息就跳过"的判断）：
+
+```csharp
+if (!item.IsShortcut || options.EnableRemoteContentProbe) { mediaInfoResult = await GetMediaInfo(item, ct); }
+```
+
+结论：**每点播一次 .strm，都会对远端直链重跑一次 ffprobe**（网络往返 + 读文件头），这才是起播慢的主因；
+而且**光"预先提取过媒体信息"并不能消除它**——这正是很多同类插件"预提取"做了却感觉没变快的原因。
+
+### 本插件怎么做
+
+装饰 `IMediaSourceManager`（与预览功能同一套装饰器方案），只在播放路径上做一件事：
+
+> 如果条目 **确实是 .strm**、**已经有对应类型的媒体流**（视频看视频流、音频看音频流）、**并且已知时长**，
+> 就把 `allowMediaProbe` 置为 false → 核心那段强制刷新不会触发 → 直接返回已有媒体信息。
+
+三个条件缺一不可，其余情况（含未探测过的条目、本地文件、直播等）**全部原样透传**，
+所以不会出现"加速把播放搞坏"的情况。关闭开关即完全恢复核心行为。
+
+### 生效顺序建议
+
+1. 先让第 4 节的探测把媒体信息补齐（新库建议先手动跑一次计划任务）；
+2. 起播加速默认开启，信息补齐的条目下次点播即可跳过探测；
+3. 是否真的跳过了，看日志关键字：`[StrmTrickplay] 起播加速：<片名> 的媒体信息已完整，跳过本次远端探测`。
+
+---
+
+## 6. 配置项（控制台 → 插件 → STRM Trickplay）
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
@@ -331,6 +379,7 @@ curl -X POST "http://<服务器>:8096/Plugins/StrmTrickplay/Probe/Item/<32位ite
 | 探测间隔 | 200 毫秒 | 0–10000，探测之间的冷却，防止连接被占满 |
 | 防抖时间 | 30 秒 | 新增条目的批量等待时间 |
 | 探测范围 | 全部媒体库 | 可只勾选部分媒体库（设置页里多选） |
+| **起播加速** | 开 | 媒体信息已完整的 .strm 点播时跳过核心强制的重复 ffprobe（见第 5 节） |
 
 计划任务有两个，都可以在 **控制台 → 计划任务** 里手动立即运行或取消：
 
@@ -343,7 +392,7 @@ curl -X POST "http://<服务器>:8096/Plugins/StrmTrickplay/Probe/Item/<32位ite
 
 ---
 
-## 6. 故障排查
+## 7. 故障排查
 
 | 症状 | 可能原因 | 处理 |
 |---|---|---|
@@ -360,7 +409,7 @@ curl -X POST "http://<服务器>:8096/Plugins/StrmTrickplay/Probe/Item/<32位ite
 
 ---
 
-## 7. 已知限制
+## 8. 已知限制
 
 1. **不生成瓦片**：只读取现成文件。想要"插件自己用 ffmpeg 抽帧"需要另外实现（接口已预留 `ITrickplayGenerator`）。
 2. **间隔靠推断**：瓦片目录里没有"每张缩略图间隔"的元数据。Jellyfin 12.2 不会自动探测 strm 的时长，
@@ -376,7 +425,7 @@ curl -X POST "http://<服务器>:8096/Plugins/StrmTrickplay/Probe/Item/<32位ite
 
 ---
 
-## 8. 相关文档与开发
+## 9. 相关文档与开发
 
 | 文档 | 内容 |
 |---|---|
@@ -400,6 +449,7 @@ Jellyfin.Plugin.StrmTrickplay/
 ├── Api/StrmTrickplayController.cs   诊断 / 自检接口
 ├── Configuration/                   配置 + 配置页
 ├── EventHandlers/                   媒体库事件监听（缓存失效 + 新增条目自动探测）
+├── Playback/                        ★ 起播加速（IMediaSourceManager 装饰器，跳过重复探测）
 ├── Probe/                           ★ STRM 媒体信息探测（ffprobe 补齐时长/编码/分辨率）
 ├── Tasks/                           计划任务（重建索引、探测媒体信息）
 └── Trickplay/

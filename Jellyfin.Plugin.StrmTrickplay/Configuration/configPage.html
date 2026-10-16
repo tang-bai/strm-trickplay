@@ -138,6 +138,16 @@
                             <input is="emby-input" type="number" id="ProbeDebounceSeconds" class="emby-input" />
                         </div>
                     </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="EnableFastStartup" />
+                            <span><b>起播加速</b>：媒体信息已完整的 .strm 点播时跳过重复探测</span>
+                        </label>
+                        <div class="fieldDescription">
+                            Jellyfin 核心对<b>每个</b> .strm 条目在每次点播时都会强制跑一次远端 ffprobe（按路径后缀判断，与信息是否齐全无关），
+                            这是起播慢的主因。打开后：只有"确实是 .strm + 已有对应媒体流 + 已知时长"的条目才跳过；其余原样探测，不影响未探测过的条目。
+                        </div>
+                    </div>
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused">探测范围（不勾选 = 全部媒体库）</label>
                         <div id="libraryList" class="libList">加载中…</div>
@@ -208,7 +218,8 @@
                 ProbeCooldownMs: 200,
                 ProbeLibraryNames: [],
                 VerboseLogging: false,
-                EnableGeneration: false
+                EnableGeneration: false,
+                EnableFastStartup: true
             };
 
             function el(id) { return document.querySelector('#' + id); }
@@ -234,6 +245,7 @@
                         ['探测并发 / 超时', probe.parallelism + ' / ' + probe.timeoutSeconds + ' 秒'],
                         ['待处理队列', probe.queuedItems + ' 个'],
                         ['最近一次探测', last ? (last.trigger + '：共 ' + last.total + '，成功 ' + last.probed + '，失败 ' + last.failed) : '尚未运行'],
+                        ['起播加速', ((s.fastStartup && s.fastStartup.enabled) ? '已启用' : '已关闭')],
                         ['ITrickplayManager', s.trickplayManagerType || '-']
                     ];
                     var html = '';
@@ -291,6 +303,7 @@
                 el('ProbeCooldownMs').value = (config.ProbeCooldownMs === 0 ? 0 : (config.ProbeCooldownMs || defaults.ProbeCooldownMs));
                 el('VerboseLogging').checked = !!config.VerboseLogging;
                 el('EnableGeneration').checked = !!config.EnableGeneration;
+                el('EnableFastStartup').checked = config.EnableFastStartup !== false;
             }
 
             function loadConfig() {
@@ -330,6 +343,7 @@
                     config.ProbeLibraryNames = collectLibraries();
                     config.VerboseLogging = el('VerboseLogging').checked;
                     config.EnableGeneration = el('EnableGeneration').checked;
+                    config.EnableFastStartup = el('EnableFastStartup').checked;
 
                     ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);
