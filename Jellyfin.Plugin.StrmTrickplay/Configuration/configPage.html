@@ -11,6 +11,14 @@
         #StrmTrickplayConfigPage { --cfg-line: rgba(128,128,128,.35); --cfg-line-soft: rgba(128,128,128,.22); --cfg-fill: rgba(128,128,128,.06); --cfg-fill-strong: rgba(128,128,128,.12); --cfg-accent: var(--theme-primary-color, var(--accent, #00a4dc)); }
 
         /* —— 模块方框 —— */
+        /* 关键：不依赖父容器的对齐方式显式铺满（仪表盘内容区可能是 flex 容器，会把 <form> 收缩成内容宽） */
+        #StrmTrickplayConfigPage,
+        #StrmTrickplayConfigPage .content-primary,
+        #StrmTrickplayConfigPage .cfgTopBar,
+        #StrmTrickplayConfigPage #StrmTrickplayConfigForm,
+        #StrmTrickplayConfigPage .cfgBox,
+        #StrmTrickplayConfigPage .cfgBoxBody { width: 100%; max-width: 100%; box-sizing: border-box; }
+
         #StrmTrickplayConfigPage .cfgBox {
             border: 1px solid var(--cfg-line);
             border-left: 3px solid var(--cfg-accent);
@@ -69,8 +77,8 @@
         #StrmTrickplayConfigPage .cfgTopActions { margin-left: auto; display: flex; flex-wrap: wrap; gap: .5em; }
 
         /* —— 栅格与列表 —— */
-        #StrmTrickplayConfigPage .cfgGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 1.2em; }
-        #StrmTrickplayConfigPage .cfgGrid-wide { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0 1.2em; }
+        #StrmTrickplayConfigPage .cfgGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 240px)); justify-content: start; gap: 0 1.2em; }
+        #StrmTrickplayConfigPage .cfgGrid-wide { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 420px)); justify-content: start; gap: 0 1.2em; }
         /* 关键：栅格项默认最小宽度 = 内容宽度，会把轨道撑开导致换行不整齐 */
         #StrmTrickplayConfigPage .cfgGrid > *,
         #StrmTrickplayConfigPage .cfgGrid-wide > * { min-width: 0; }
@@ -96,6 +104,9 @@
             font-size: .85em;
         }
         #StrmTrickplayConfigPage .cfgFieldLabel { display: block; margin-bottom: .35em; font-size: .95em; opacity: .9; }
+        /* jellyfin-web 对 emby-textarea 没有任何样式（也没有 .textareaLabel），这里自己给 */
+        #StrmTrickplayConfigPage .cfgTextarea { display: block; width: 100%; box-sizing: border-box; min-height: 3.6em; padding: .5em .6em; border: 1px solid rgba(128,128,128,.45); border-radius: 4px; background: rgba(0,0,0,.15); color: inherit; font-family: inherit; font-size: 1em; line-height: 1.45; resize: vertical; }
+        #StrmTrickplayConfigPage .cfgTextarea:focus { outline: 2px solid var(--cfg-accent); outline-offset: -1px; }
         #StrmTrickplayConfigPage .cfgMini { font-size: .86em; opacity: .75; }
     </style>
 
@@ -154,7 +165,8 @@
                     </div>
                     <div class="cfgBoxBody">
                         <div class="inputContainer">
-                            <textarea is="emby-textarea" id="SidecarFolderNames" label="侧车目录名（每行一个，{name} 代表媒体文件名）" rows="3"></textarea>
+                            <div class="cfgFieldLabel">侧车目录名（每行一个，{name} 代表媒体文件名）</div>
+                            <textarea is="emby-textarea" id="SidecarFolderNames" class="cfgTextarea" rows="3"></textarea>
                             <div class="fieldDescription">
                                 默认 <code>{name}.trickplay</code> 与 <code>trickplay</code>。目录内规范：
                                 <code>&lt;宽&gt; - &lt;每行张数&gt;x&lt;每列张数&gt;/&lt;序号&gt;.jpg</code>，例如 <code>320 - 10x10/0.jpg</code>。
