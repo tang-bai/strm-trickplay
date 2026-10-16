@@ -26,6 +26,7 @@ SUMMARY_HEADING = re.compile(r"^###\s+(?:变更摘要|摘要|summary)\s*$", re.I
 ANY_HEADING = re.compile(r"^#{1,6}\s+")
 LIST_ITEM = re.compile(r"^\s*[-*+]\s+(.+?)\s*$")
 FENCE = re.compile(r"^\s*```")
+HORIZONTAL_RULE = re.compile(r"^\s*(?:-{3,}|\*{3,}|_{3,})\s*$")
 
 MAX_SUMMARY = 300
 
@@ -77,6 +78,14 @@ def list_versions(path: Path = DEFAULT_FILE) -> list[str]:
     return [version for version, _ in iter_sections(path.read_text(encoding="utf-8"))]
 
 
+def strip_trailing_rules(body: str) -> str:
+    """去掉小节结尾的水平分隔线与空行（各版本之间用 --- 分隔，不该带进 Release 正文）。"""
+    lines = body.splitlines()
+    while lines and (not lines[-1].strip() or HORIZONTAL_RULE.match(lines[-1])):
+        lines.pop()
+    return "\n".join(lines).strip()
+
+
 def extract(version: str, path: Path = DEFAULT_FILE) -> str | None:
     """取某个版本的说明正文（不含标题行）。"""
     if not path.is_file():
@@ -84,7 +93,7 @@ def extract(version: str, path: Path = DEFAULT_FILE) -> str | None:
     wanted = normalize_version(version)
     for found, body in iter_sections(path.read_text(encoding="utf-8")):
         if found == wanted:
-            return body
+            return strip_trailing_rules(body)
     return None
 
 

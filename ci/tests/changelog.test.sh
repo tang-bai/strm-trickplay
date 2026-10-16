@@ -46,6 +46,8 @@ cat > "$WORK/CHANGELOG.md" <<'EOF'
 - 条目一
 - 条目二
 
+---
+
 ## [0.3.0.0] - 2026-09-20
 - 没有摘要小节时，取第一条列表项
 - 第二条
@@ -60,6 +62,7 @@ check "含摘要" "yes" "$(grep -q '一句话摘要：发版说明自动化' <<<
 check "含条目" "yes" "$(grep -q '条目二' <<< "$full" && echo yes || echo no)"
 check "不含下一版本内容" "no" "$(grep -q '第二条' <<< "$full" && echo yes || echo no)"
 check "不含标题行" "no" "$(grep -q '^## ' <<< "$full" && echo yes || echo no)"
+check "不含结尾分隔线" "no" "$(grep -q -- '^---$' <<< "$full" && echo yes || echo no)"
 
 echo "=== 用例 3：单行摘要 ==="
 check "取变更摘要" "一句话摘要：发版说明自动化" "$(python3 ci/changelog.py --file "$WORK/CHANGELOG.md" --version 0.4.0.0 --format summary)"

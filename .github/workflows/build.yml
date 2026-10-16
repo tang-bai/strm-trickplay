@@ -240,15 +240,12 @@ jobs:
             echo "### 安装 / 升级"
             echo
             echo "- 已添加插件存储库：Jellyfin 控制台 → 插件 → 目录 → 升级"
-            echo "  （存储库地址 `https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BRANCH}/docs/manifest.json`）"
-            echo "- 手动安装：下载下方 `strm-trickplay_${VERSION}.zip`，解压到 Jellyfin 插件目录后重启（见 README 第 2 节）"
+            printf -- '- 存储库地址：%s\n' "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BRANCH}/docs/manifest.json"
+            printf -- '- 手动安装：下载下方 strm-trickplay_%s.zip，解压到 Jellyfin 插件目录后重启（见 README 第 2 节）\n' "$VERSION"
             echo
             echo "### 校验"
             echo
-            echo '```'
-            [[ -n "$md5_line" ]] && echo "$md5_line"
-            [[ -n "$sha_line" ]] && echo "$sha_line"
-            echo '```'
+            printf -- '```\n%s\n%s\n```\n' "$md5_line" "$sha_line"
           } >> release-notes.md
           echo "----- Release 说明 -----"
           cat release-notes.md
