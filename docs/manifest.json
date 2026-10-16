@@ -9,6 +9,16 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.5.2.0",
+        "changelog": "设置页排版收尾：栅格不再乱换行、状态卡长文本不再被截断、区块间距与复选框布局整理",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/strm-trickplay_0.5.2.0.zip",
+        "checksum": "7004115ABD9629351DAB09873BA69EC5",
+        "timestamp": "2026-10-16T23:25:02.3267270Z",
+        "repositoryName": "STRM Trickplay",
+        "repositoryUrl": "https://github.com/tang-bai/strm-trickplay"
+      },
+      {
         "version": "0.5.1.0",
         "changelog": "修复设置页在真实控制台里的字段错位，并新增侧边栏「插件 → STRM Trickplay」入口",
         "targetAbi": "12.2.0.0",
