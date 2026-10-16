@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8" />
@@ -7,190 +7,330 @@
 <body>
 <div id="StrmTrickplayConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
     <style>
+        /* 颜色全部用中性灰半透明 + 主题色兜底，明暗主题都能用，不写死具体配色 */
+        #StrmTrickplayConfigPage { --cfg-line: rgba(128,128,128,.35); --cfg-line-soft: rgba(128,128,128,.22); --cfg-fill: rgba(128,128,128,.06); --cfg-fill-strong: rgba(128,128,128,.12); --cfg-accent: var(--theme-primary-color, var(--accent, #00a4dc)); }
+
+        /* —— 模块方框 —— */
+        #StrmTrickplayConfigPage .cfgBox {
+            border: 1px solid var(--cfg-line);
+            border-left: 3px solid var(--cfg-accent);
+            border-radius: 8px;
+            background: var(--cfg-fill);
+            margin: 0 0 1.1em;
+            overflow: hidden;
+        }
+        #StrmTrickplayConfigPage .cfgBoxHeader {
+            display: flex;
+            align-items: center;
+            gap: .7em;
+            padding: .7em 1.05em;
+            background: var(--cfg-fill-strong);
+            border-bottom: 1px solid var(--cfg-line-soft);
+        }
+        #StrmTrickplayConfigPage .cfgBox[data-collapsible] .cfgBoxHeader { cursor: pointer; user-select: none; }
+        #StrmTrickplayConfigPage .cfgBox[data-collapsible] .cfgBoxHeader:hover .cfgChevron { opacity: 1; }
+        #StrmTrickplayConfigPage .cfgBox[data-collapsible] .cfgBoxHeader:hover { background: rgba(128,128,128,.18); }
+        #StrmTrickplayConfigPage .cfgBox[data-collapsible] .cfgBoxHeader:focus-visible { outline: 2px solid var(--cfg-accent); outline-offset: -2px; }
+        #StrmTrickplayConfigPage .cfgBox.collapsed .cfgBoxBody { display: none; }
+        #StrmTrickplayConfigPage .cfgBox.collapsed .cfgBoxHeader { border-bottom: 0; }
+        #StrmTrickplayConfigPage .cfgBox.collapsed .cfgChevron { transform: rotate(-90deg); }
+
+        #StrmTrickplayConfigPage .cfgBadge {
+            flex: 0 0 auto;
+            min-width: 1.75em;
+            height: 1.75em;
+            padding: 0 .45em;
+            box-sizing: border-box;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .82em;
+            font-weight: 600;
+            letter-spacing: .02em;
+            color: inherit;
+            border: 1px solid var(--cfg-line);
+            background: var(--cfg-fill-strong);
+        }
+        #StrmTrickplayConfigPage .cfgBoxTitle { margin: 0; font-size: 1.02em; font-weight: 600; }
+        #StrmTrickplayConfigPage .cfgBoxHint { margin-left: auto; font-size: .82em; opacity: .7; text-align: right; }
+        #StrmTrickplayConfigPage .cfgChevron { flex: 0 0 auto; opacity: .65; transition: transform .15s ease; font-size: .9em; }
+        #StrmTrickplayConfigPage .cfgBoxBody { padding: .9em 1.05em .25em; }
+        #StrmTrickplayConfigPage .cfgBoxBody > .fieldDescription:first-child { margin-top: 0; }
+        #StrmTrickplayConfigPage .cfgBoxBody .inputContainer:last-child,
+        #StrmTrickplayConfigPage .cfgBoxBody .checkboxContainer:last-child { margin-bottom: .55em; }
+
+        /* —— 页头 —— */
+        #StrmTrickplayConfigPage .cfgTopBar { display: flex; align-items: flex-start; flex-wrap: wrap; gap: .8em; margin: 0 0 1.1em; }
+        #StrmTrickplayConfigPage .cfgTopHint { opacity: .7; font-size: .88em; margin-top: .15em; }
+        #StrmTrickplayConfigPage .cfgTopActions { margin-left: auto; display: flex; flex-wrap: wrap; gap: .5em; }
+
+        /* —— 栅格与列表 —— */
         #StrmTrickplayConfigPage .cfgGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0 1.2em; }
-        #StrmTrickplayConfigPage .statusGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .25em 1.5em; padding: .6em .9em; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; }
+        #StrmTrickplayConfigPage .cfgGrid-wide { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 1.2em; }
+        #StrmTrickplayConfigPage .statusGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: .2em 1.5em; }
+        #StrmTrickplayConfigPage .statusGrid > div { padding: .18em 0; }
         #StrmTrickplayConfigPage .statusGrid b { font-weight: 600; }
-        #StrmTrickplayConfigPage .libList { max-height: 15em; overflow: auto; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: .3em .9em; }
+        #StrmTrickplayConfigPage .libList { max-height: 15em; overflow: auto; border: 1px solid var(--cfg-line-soft); border-radius: 6px; padding: .3em .9em; }
         #StrmTrickplayConfigPage .libList .checkboxContainer { margin: .35em 0; }
-        #StrmTrickplayConfigPage pre.result { max-height: 18em; overflow: auto; padding: .7em; border-radius: 6px; background: rgba(0,0,0,.18); white-space: pre-wrap; word-break: break-word; font-size: .85em; }
-        #StrmTrickplayConfigPage .actionBar { display: flex; flex-wrap: wrap; gap: .6em; margin-bottom: .8em; }
-        #StrmTrickplayConfigPage .sectionHint { margin: -.4em 0 .8em; opacity: .8; }
+        #StrmTrickplayConfigPage .actionBar { display: flex; flex-wrap: wrap; gap: .6em; margin-bottom: .9em; }
+        #StrmTrickplayConfigPage pre.result {
+            max-height: 18em;
+            overflow: auto;
+            margin: 0 0 .8em;
+            padding: .7em;
+            border: 1px solid var(--cfg-line-soft);
+            border-radius: 6px;
+            background: rgba(0,0,0,.16);
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: .85em;
+        }
+        #StrmTrickplayConfigPage .cfgMini { font-size: .86em; opacity: .75; }
     </style>
 
     <div data-role="content">
         <div class="content-primary">
 
-            <div class="verticalSection">
-                <div class="sectionTitleContainer flex align-items-center">
-                    <h2 class="sectionTitle">STRM Trickplay</h2>
-                    <a is="emby-linkbutton" class="button-link bglink" style="margin-left:1em" target="_blank" rel="noopener"
-                       href="https://github.com/tang-bai/strm-trickplay">项目主页</a>
+            <div class="cfgTopBar">
+                <div>
+                    <h2 class="sectionTitle" style="margin:0">STRM Trickplay</h2>
+                    <div class="cfgTopHint">.strm 进度条预览 · 媒体信息探测 · 起播加速</div>
                 </div>
-                <div class="sectionHint">
-                    让 .strm 条目用同级的 <code>&lt;文件名&gt;.trickplay</code> 瓦片显示进度条预览，并可为 .strm 补齐时长 / 编码 / 分辨率等媒体信息。
+                <div class="cfgTopActions">
+                    <button is="emby-button" type="button" id="btnExpandAll" class="raised emby-button"><span>全部展开</span></button>
+                    <button is="emby-button" type="button" id="btnCollapseAll" class="raised emby-button"><span>全部折叠</span></button>
+                    <button is="emby-button" type="button" id="btnRefreshStatus" class="raised emby-button"><span>刷新状态</span></button>
                 </div>
-                <div id="statusGrid" class="statusGrid">加载中…</div>
             </div>
+
+            <section class="cfgBox" data-module="status">
+                <div class="cfgBoxHeader">
+                    <span class="cfgBadge">状态</span>
+                    <h3 class="cfgBoxTitle">运行状态</h3>
+                    <span class="cfgBoxHint">插件是否生效、探测与索引现状</span>
+                </div>
+                <div class="cfgBoxBody">
+                    <div id="statusGrid" class="statusGrid">加载中…</div>
+                </div>
+            </section>
 
             <form id="StrmTrickplayConfigForm">
 
-                <div class="verticalSection">
-                    <h2 class="sectionTitle">1. 基本</h2>
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="Enabled" />
-                            <span>启用插件</span>
-                        </label>
-                        <div class="fieldDescription">关闭后完全透传 Jellyfin 核心行为（.strm 将没有进度条预览，也不再探测媒体信息）。</div>
+                <section class="cfgBox" data-module="general" data-collapsible="1">
+                    <div class="cfgBoxHeader" role="button" tabindex="0" aria-expanded="true" title="点击折叠 / 展开这个模块">
+                        <span class="cfgBadge">1</span>
+                        <h3 class="cfgBoxTitle">基本</h3>
+                        <span class="cfgBoxHint">总开关</span>
+                        <span class="cfgChevron">▾</span>
                     </div>
-                </div>
+                    <div class="cfgBoxBody">
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="Enabled" />
+                                <span>启用插件</span>
+                            </label>
+                            <div class="fieldDescription">关闭后完全透传 Jellyfin 核心行为：.strm 没有进度条预览，也不再探测媒体信息、不做起播加速。</div>
+                        </div>
+                    </div>
+                </section>
 
-                <div class="verticalSection">
-                    <h2 class="sectionTitle">2. 目录与解析</h2>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="SidecarFolderNames">侧车目录名（每行一个，{name} 代表媒体文件名）</label>
-                        <textarea is="emby-textarea" id="SidecarFolderNames" class="emby-textarea" rows="3"></textarea>
-                        <div class="fieldDescription">默认 <code>{name}.trickplay</code> 与 <code>trickplay</code>。目录内规范：<code>&lt;宽&gt; - &lt;每行张数&gt;x&lt;每列张数&gt;/&lt;序号&gt;.jpg</code>，例如 <code>320 - 10x10/0.jpg</code>。</div>
+                <section class="cfgBox" data-module="layout" data-collapsible="1">
+                    <div class="cfgBoxHeader" role="button" tabindex="0" aria-expanded="true" title="点击折叠 / 展开这个模块">
+                        <span class="cfgBadge">2</span>
+                        <h3 class="cfgBoxTitle">目录与解析</h3>
+                        <span class="cfgBoxHint">去哪里找瓦片、怎么认</span>
+                        <span class="cfgChevron">▾</span>
                     </div>
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="AllowAnySiblingTrickplayFolder" />
-                            <span>允许同目录下任意 *.trickplay 目录作为兜底</span>
-                        </label>
-                        <div class="fieldDescription">媒体文件被改名后仍能找到瓦片（可能误匹配，默认关闭）。</div>
-                    </div>
-                    <div class="cfgGrid">
+                    <div class="cfgBoxBody">
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="DefaultWidth">兜底缩略图宽度（px）</label>
-                            <input is="emby-input" type="number" id="DefaultWidth" class="emby-input" />
+                            <label class="inputLabel inputLabelUnfocused" for="SidecarFolderNames">侧车目录名（每行一个，{name} 代表媒体文件名）</label>
+                            <textarea is="emby-textarea" id="SidecarFolderNames" class="emby-textarea" rows="3"></textarea>
+                            <div class="fieldDescription">
+                                默认 <code>{name}.trickplay</code> 与 <code>trickplay</code>。目录内规范：
+                                <code>&lt;宽&gt; - &lt;每行张数&gt;x&lt;每列张数&gt;/&lt;序号&gt;.jpg</code>，例如 <code>320 - 10x10/0.jpg</code>。
+                            </div>
                         </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="DefaultTileWidth">兜底瓦片网格宽</label>
-                            <input is="emby-input" type="number" id="DefaultTileWidth" class="emby-input" />
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="AllowAnySiblingTrickplayFolder" />
+                                <span>允许同目录下任意 *.trickplay 目录作为兜底</span>
+                            </label>
+                            <div class="fieldDescription">媒体文件被改名后仍能找到瓦片（可能误匹配，默认关闭）。</div>
                         </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="DefaultTileHeight">兜底瓦片网格高</label>
-                            <input is="emby-input" type="number" id="DefaultTileHeight" class="emby-input" />
+                        <div class="cfgGrid">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="DefaultWidth">兜底缩略图宽度（px）</label>
+                                <input is="emby-input" type="number" id="DefaultWidth" class="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="DefaultTileWidth">兜底瓦片网格宽</label>
+                                <input is="emby-input" type="number" id="DefaultTileWidth" class="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="DefaultTileHeight">兜底瓦片网格高</label>
+                                <input is="emby-input" type="number" id="DefaultTileHeight" class="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="IntervalOverrideMs">强制缩略图间隔（毫秒，0=自动）</label>
+                                <input is="emby-input" type="number" id="IntervalOverrideMs" class="emby-input" />
+                            </div>
                         </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="IntervalOverrideMs">强制缩略图间隔（毫秒，0=自动）</label>
-                            <input is="emby-input" type="number" id="IntervalOverrideMs" class="emby-input" />
-                        </div>
-                    </div>
-                    <div class="fieldDescription">
-                        自动模式与 Jellyfin 官方 12.2 的推断算法一致；<b>显式填值则以你为准</b>——预览缩略图位置有偏移时用它校准（常见值 2000 / 5000 / 10000）。
-                    </div>
-                </div>
-
-                <div class="verticalSection">
-                    <h2 class="sectionTitle">3. 缓存</h2>
-                    <div class="cfgGrid">
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="CacheSeconds">命中缓存（秒）</label>
-                            <input is="emby-input" type="number" id="CacheSeconds" class="emby-input" />
-                        </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="EmptyCacheSeconds">未命中缓存（秒）</label>
-                            <input is="emby-input" type="number" id="EmptyCacheSeconds" class="emby-input" />
-                        </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="UnknownRuntimeCacheSeconds">未知时长缓存（秒）</label>
-                            <input is="emby-input" type="number" id="UnknownRuntimeCacheSeconds" class="emby-input" />
-                        </div>
-                    </div>
-                    <div class="fieldDescription">.strm 的时长常常探测不到，此时用较短的"未知时长缓存"，等探测补齐时长后会自动按官方算法重算间隔。</div>
-                </div>
-
-                <div class="verticalSection">
-                    <h2 class="sectionTitle">4. STRM 媒体信息探测</h2>
-                    <div class="sectionHint">
-                        Jellyfin 会把 .strm 当"快捷方式"跳过库扫描探测，导致条目没有时长 / 编码 / 分辨率（还会出现"看几秒就被标记已看"、无法按分辨率筛选）。打开后插件会用 ffprobe 探测远端直链补齐这些信息。
-                    </div>
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="EnableMediaProbe" />
-                            <span>启用媒体信息探测</span>
-                        </label>
-                        <div class="fieldDescription">关闭后计划任务会直接跳过；已有的媒体信息不受影响。</div>
-                    </div>
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="EnableProbeOnItemAdded" />
-                            <span>新增 .strm 时自动探测（推荐）</span>
-                        </label>
-                        <div class="fieldDescription">库扫描新增条目后按下面的"防抖时间"批次探测，不必手动跑任务。</div>
-                    </div>
-                    <div class="cfgGrid">
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="ProbeParallelism">并发数（1-20）</label>
-                            <input is="emby-input" type="number" id="ProbeParallelism" class="emby-input" />
-                        </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="ProbeTimeoutSeconds">单项超时（秒，5-600）</label>
-                            <input is="emby-input" type="number" id="ProbeTimeoutSeconds" class="emby-input" />
-                        </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="ProbeCooldownMs">探测间隔（毫秒，0-10000）</label>
-                            <input is="emby-input" type="number" id="ProbeCooldownMs" class="emby-input" />
-                        </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="ProbeDebounceSeconds">防抖时间（秒）</label>
-                            <input is="emby-input" type="number" id="ProbeDebounceSeconds" class="emby-input" />
-                        </div>
-                    </div>
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="EnableFastStartup" />
-                            <span><b>起播加速</b>：媒体信息已完整的 .strm 点播时跳过重复探测</span>
-                        </label>
                         <div class="fieldDescription">
-                            Jellyfin 核心对<b>每个</b> .strm 条目在每次点播时都会强制跑一次远端 ffprobe（按路径后缀判断，与信息是否齐全无关），
-                            这是起播慢的主因。打开后：只有"确实是 .strm + 已有对应媒体流 + 已知时长"的条目才跳过；其余原样探测，不影响未探测过的条目。
+                            自动模式与 Jellyfin 官方 12.2 的推断算法一致；<b>显式填值则以你为准</b>——预览缩略图位置有偏移时用它校准（常见值 2000 / 5000 / 10000）。
                         </div>
                     </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused">探测范围（不勾选 = 全部媒体库）</label>
-                        <div id="libraryList" class="libList">加载中…</div>
-                        <div class="fieldDescription">网盘直链探测会产生一定的下行流量，建议先只勾选一两个库试跑。</div>
-                    </div>
-                </div>
+                </section>
 
-                <div class="verticalSection">
-                    <h2 class="sectionTitle">5. 高级</h2>
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="VerboseLogging" />
-                            <span>输出详细日志</span>
-                        </label>
-                        <div class="fieldDescription">排查问题时打开（日志关键字 <code>[StrmTrickplay]</code>）。</div>
+                <section class="cfgBox" data-module="cache" data-collapsible="1">
+                    <div class="cfgBoxHeader" role="button" tabindex="0" aria-expanded="true" title="点击折叠 / 展开这个模块">
+                        <span class="cfgBadge">3</span>
+                        <h3 class="cfgBoxTitle">缓存</h3>
+                        <span class="cfgBoxHint">索引缓存时长</span>
+                        <span class="cfgChevron">▾</span>
                     </div>
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="EnableGeneration" />
-                            <span>允许生成器为 .strm 抽帧（预留，当前无实现）</span>
-                        </label>
-                        <div class="fieldDescription">当前版本只读取现成瓦片，不做 ffmpeg 抽帧。</div>
+                    <div class="cfgBoxBody">
+                        <div class="cfgGrid">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="CacheSeconds">命中缓存（秒）</label>
+                                <input is="emby-input" type="number" id="CacheSeconds" class="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="EmptyCacheSeconds">未命中缓存（秒）</label>
+                                <input is="emby-input" type="number" id="EmptyCacheSeconds" class="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="UnknownRuntimeCacheSeconds">未知时长缓存（秒）</label>
+                                <input is="emby-input" type="number" id="UnknownRuntimeCacheSeconds" class="emby-input" />
+                            </div>
+                        </div>
+                        <div class="fieldDescription">.strm 的时长常常探测不到，此时用较短的"未知时长缓存"；等探测补齐时长后会自动按官方算法重算间隔。</div>
                     </div>
-                </div>
+                </section>
 
-                <div class="verticalSection">
-                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
-                        <span>保存</span>
-                    </button>
-                </div>
+                <section class="cfgBox" data-module="probe" data-collapsible="1">
+                    <div class="cfgBoxHeader" role="button" tabindex="0" aria-expanded="true" title="点击折叠 / 展开这个模块">
+                        <span class="cfgBadge">4</span>
+                        <h3 class="cfgBoxTitle">媒体信息探测与起播加速</h3>
+                        <span class="cfgBoxHint">补齐时长/编码/分辨率 & 跳过重复探测</span>
+                        <span class="cfgChevron">▾</span>
+                    </div>
+                    <div class="cfgBoxBody">
+                        <div class="fieldDescription">
+                            Jellyfin 会把 .strm 当"快捷方式"跳过库扫描探测，导致条目没有时长 / 编码 / 分辨率（还会出现"看几秒就被标记已看"、无法按分辨率筛选）。
+                            打开后用 ffprobe 探测远端直链补齐；同时，信息补齐的条目在点播时会跳过核心那次重复探测（起播加速）。
+                        </div>
+
+                        <div class="cfgGrid-wide">
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input is="emby-checkbox" type="checkbox" id="EnableMediaProbe" />
+                                    <span>启用媒体信息探测</span>
+                                </label>
+                                <div class="fieldDescription">关闭后计划任务直接跳过；已有的媒体信息不受影响。</div>
+                            </div>
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input is="emby-checkbox" type="checkbox" id="EnableProbeOnItemAdded" />
+                                    <span>新增 .strm 时自动探测（推荐）</span>
+                                </label>
+                                <div class="fieldDescription">库扫描新增条目后按防抖时间凑批探测，不必手动跑任务。</div>
+                            </div>
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input is="emby-checkbox" type="checkbox" id="EnableFastStartup" />
+                                    <span><b>起播加速</b>：信息已完整的 .strm 点播时跳过重复探测</span>
+                                </label>
+                                <div class="fieldDescription">
+                                    核心对<b>每个</b> .strm 在每次点播时都会强制跑一次远端 ffprobe（按路径后缀判断，与信息是否齐全无关）。
+                                    只有"确实是 .strm + 已有对应媒体流 + 已知时长"三条同时满足才跳过，其余原样探测。
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="cfgGrid">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="ProbeParallelism">并发数（1-20）</label>
+                                <input is="emby-input" type="number" id="ProbeParallelism" class="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="ProbeTimeoutSeconds">单项超时（秒，5-600）</label>
+                                <input is="emby-input" type="number" id="ProbeTimeoutSeconds" class="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="ProbeCooldownMs">探测间隔（毫秒，0-10000）</label>
+                                <input is="emby-input" type="number" id="ProbeCooldownMs" class="emby-input" />
+                            </div>
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="ProbeDebounceSeconds">防抖时间（秒）</label>
+                                <input is="emby-input" type="number" id="ProbeDebounceSeconds" class="emby-input" />
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused">探测范围（不勾选 = 全部媒体库）</label>
+                            <div id="libraryList" class="libList">加载中…</div>
+                            <div class="fieldDescription">网盘直链探测会产生一定下行流量，建议先只勾选一两个库试跑。</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="cfgBox" data-module="advanced" data-collapsible="1">
+                    <div class="cfgBoxHeader" role="button" tabindex="0" aria-expanded="true" title="点击折叠 / 展开这个模块">
+                        <span class="cfgBadge">5</span>
+                        <h3 class="cfgBoxTitle">高级</h3>
+                        <span class="cfgBoxHint">日志与预留项</span>
+                        <span class="cfgChevron">▾</span>
+                    </div>
+                    <div class="cfgBoxBody">
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="VerboseLogging" />
+                                <span>输出详细日志</span>
+                            </label>
+                            <div class="fieldDescription">排查问题时打开（日志关键字 <code>[StrmTrickplay]</code>）。</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="EnableGeneration" />
+                                <span>允许生成器为 .strm 抽帧（预留，当前无实现）</span>
+                            </label>
+                            <div class="fieldDescription">当前版本只读取现成瓦片，不做 ffmpeg 抽帧。</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="cfgBox" data-module="save">
+                    <div class="cfgBoxHeader">
+                        <span class="cfgBadge">保存</span>
+                        <h3 class="cfgBoxTitle">应用设置</h3>
+                        <span class="cfgBoxHint">改动立即写入插件配置</span>
+                    </div>
+                    <div class="cfgBoxBody">
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>保存</span>
+                        </button>
+                        <div class="fieldDescription cfgMini">保存后无需重启 Jellyfin；探测与索引相关改动会在下一次任务 / 下一个请求生效。</div>
+                    </div>
+                </section>
             </form>
 
-            <div class="verticalSection">
-                <h2 class="sectionTitle">运行操作</h2>
-                <div class="actionBar">
-                    <button is="emby-button" type="button" id="btnSelfTest" class="raised emby-button"><span>运行自检</span></button>
-                    <button is="emby-button" type="button" id="btnCount" class="raised emby-button"><span>统计待探测条目</span></button>
-                    <button is="emby-button" type="button" id="btnProbe" class="raised emby-button"><span>立即探测（后台）</span></button>
-                    <button is="emby-button" type="button" id="btnIndex" class="raised emby-button"><span>重建 trickplay 索引</span></button>
-                    <button is="emby-button" type="button" id="btnRefreshStatus" class="raised emby-button"><span>刷新状态</span></button>
+            <section class="cfgBox" data-module="actions">
+                <div class="cfgBoxHeader">
+                    <span class="cfgBadge">操作</span>
+                    <h3 class="cfgBoxTitle">运行操作</h3>
+                    <span class="cfgBoxHint">即时执行，结果输出在下方</span>
                 </div>
-                <pre id="actionResult" class="result">（点上面的按钮查看结果）</pre>
-            </div>
+                <div class="cfgBoxBody">
+                    <div class="actionBar">
+                        <button is="emby-button" type="button" id="btnSelfTest" class="raised emby-button"><span>运行自检</span></button>
+                        <button is="emby-button" type="button" id="btnCount" class="raised emby-button"><span>统计待探测条目</span></button>
+                        <button is="emby-button" type="button" id="btnProbe" class="raised emby-button"><span>立即探测（后台）</span></button>
+                        <button is="emby-button" type="button" id="btnIndex" class="raised emby-button"><span>重建 trickplay 索引</span></button>
+                    </div>
+                    <pre id="actionResult" class="result">（点上面的按钮查看结果）</pre>
+                </div>
+            </section>
 
         </div>
     </div>
@@ -199,6 +339,7 @@
         (function () {
             var pluginId = '3f9a7c14-5b62-4d8e-9a10-7c6e2f5b8d31';
             var apiBase = 'Plugins/StrmTrickplay';
+            var collapseKeyPrefix = 'strmTrickplay.collapsed.';
             var defaults = {
                 Enabled: true,
                 SidecarFolderNames: ['{name}.trickplay', 'trickplay'],
@@ -225,6 +366,7 @@
             function el(id) { return document.querySelector('#' + id); }
             function num(id) { return parseInt(el(id).value || '0', 10) || 0; }
             function show(obj) { el('actionResult').textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2); }
+            function boxes() { return document.querySelectorAll('#StrmTrickplayConfigPage .cfgBox[data-collapsible]'); }
 
             function api(method, url) {
                 return ApiClient.fetch({
@@ -234,6 +376,45 @@
                 });
             }
 
+            /* —— 模块方框折叠 —— */
+            function setCollapsed(box, collapsed) {
+                if (collapsed) { box.classList.add('collapsed'); } else { box.classList.remove('collapsed'); }
+                var header = box.querySelector('.cfgBoxHeader');
+                if (header) { header.setAttribute('aria-expanded', collapsed ? 'false' : 'true'); }
+                try {
+                    var key = collapseKeyPrefix + box.getAttribute('data-module');
+                    if (collapsed) { localStorage.setItem(key, '1'); } else { localStorage.removeItem(key); }
+                } catch (e) { }
+            }
+
+            function initCollapsible() {
+                var list = boxes();
+                for (var i = 0; i < list.length; i++) {
+                    (function (box) {
+                        var header = box.querySelector('.cfgBoxHeader');
+                        if (!header) { return; }
+                        header.addEventListener('click', function () {
+                            setCollapsed(box, !box.classList.contains('collapsed'));
+                        });
+                        header.addEventListener('keydown', function (e) {
+                            if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+                                e.preventDefault();
+                                setCollapsed(box, !box.classList.contains('collapsed'));
+                            }
+                        });
+                        var collapsed = false;
+                        try { collapsed = localStorage.getItem(collapseKeyPrefix + box.getAttribute('data-module')) === '1'; } catch (e) { }
+                        setCollapsed(box, collapsed);
+                    })(list[i]);
+                }
+            }
+
+            function setAllCollapsed(collapsed) {
+                var list = boxes();
+                for (var i = 0; i < list.length; i++) { setCollapsed(list[i], collapsed); }
+            }
+
+            /* —— 状态卡 —— */
             function loadStatus() {
                 api('GET', apiBase + '/Status').then(function (s) {
                     var probe = s.mediaProbe || {};
@@ -258,6 +439,7 @@
                 });
             }
 
+            /* —— 媒体库多选 —— */
             function renderLibraries(virtualFolders, selected) {
                 var box = el('libraryList');
                 if (!virtualFolders || !virtualFolders.length) {
@@ -284,6 +466,7 @@
                 return result;
             }
 
+            /* —— 配置读写 —— */
             function applyConfig(config) {
                 el('Enabled').checked = config.Enabled !== false;
                 el('SidecarFolderNames').value = (config.SidecarFolderNames || defaults.SidecarFolderNames).join('\n');
@@ -354,6 +537,10 @@
                 return false;
             });
 
+            /* —— 顶部与运行操作按钮 —— */
+            el('btnExpandAll').addEventListener('click', function () { setAllCollapsed(false); });
+            el('btnCollapseAll').addEventListener('click', function () { setAllCollapsed(true); });
+
             el('btnSelfTest').addEventListener('click', function () {
                 show('运行中…');
                 api('POST', apiBase + '/SelfTest').then(show, function (e) { show('自检失败：' + e.status); });
@@ -373,7 +560,6 @@
 
             el('btnProbe').addEventListener('click', function () {
                 api('POST', apiBase + '/Probe/Run').then(function (r) {
-                    show(r);
                     show(JSON.stringify(r, null, 2) + '\n\n任务已在后台运行，可在 控制台 → 计划任务 里查看进度。');
                 }, function (e) { show('触发失败：' + e.status); });
             });
@@ -390,6 +576,7 @@
                 show('状态已刷新');
             });
 
+            initCollapsible();
             loadConfig().then(loadStatus);
         })();
     </script>
