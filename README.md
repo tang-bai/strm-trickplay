@@ -195,7 +195,7 @@ curl    "http://<server>:8096/Videos/<itemId>/Trickplay/320/tiles.m3u8?MediaSour
 
 - **push 之后立即可用**（零配置）：`https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/manifest.json`
 - 想用短域名：`Settings → Pages` 选 **分支 main / 目录 /docs** → `https://tang-bai.github.io/strm-trickplay/manifest.json`
-- 要发新版：`Settings → Actions → General` 权限设为 **Read and write**，然后推 tag（CI 会把新包与清单提交回 `docs/` 并创建 Release）
+- 要发新版：**改 [plugin.json](plugin.json) 的 `version` 后 push 即可** —— CI 会自动打 tag、创建 Release（附 zip + `.md5` + `.sha256` 校验文件）、并把新包与清单提交回 `docs/`（需先把 `Settings → Actions → General` 权限设为 **Read and write**）
 
 本地等价命令（版本号唯一来源是 [plugin.json](plugin.json)，CI 与本地共用同一套脚本）：
 
@@ -237,6 +237,7 @@ python ci/publish.py --skip-build
 ci/package.py                        ★ 生成 meta.json 并打包出 zip（跨平台）
 ci/repo.py                           ★ 生成 Jellyfin 插件仓库 manifest.json（含 MD5 校验和）
 ci/publish.py                        ★ 把插件包 + manifest 发布到 docs/（Jellyfin 存储库的来源）
+ci/tests/                            ★ 版本解析 / 发版判定逻辑的离线测试（真 bash 跑）
 docs/                                ★ 分发目录：manifest.json + strm-trickplay_<版本>.zip
 plugin.json                          ★ 唯一版本/元数据来源（version / targetAbi / guid / 描述）
 Jellyfin.Plugin.StrmTrickplay/

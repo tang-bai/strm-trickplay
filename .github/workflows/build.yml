@@ -62,6 +62,7 @@ jobs:
           set -euo pipefail
           manual="${INPUT_VERSION:-}"
           publish="${INPUT_PUBLISH:-false}"
+
           if [[ -n "$manual" ]]; then
             raw="$manual"
             release="$publish"
@@ -70,9 +71,21 @@ jobs:
             release="true"
           else
             base="$(python3 -c "import json,pathlib;print(json.loads(pathlib.Path('plugin.json').read_text(encoding='utf-8'))['version'])")"
-            raw="$(echo "$base" | cut -d. -f1-3).${GITHUB_RUN_NUMBER}"
-            release="false"
+            IFS='.' read -r v1 v2 v3 v4 <<< "$base"
+            base="${v1:-0}.${v2:-0}.${v3:-0}.${v4:-0}"
+            dev="$(echo "$base" | cut -d. -f1-3).${GITHUB_RUN_NUMBER}"
+
+            if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+              raw="$dev"; release="false"
+            elif git ls-remote --exit-code --tags origin "refs/tags/v${base}" >/dev/null 2>&1; then
+              raw="$dev"; release="false"
+              echo "v${base} 已经发布过，本次只产出开发构建产物"
+            else
+              raw="$base"; release="true"
+              echo "plugin.json 里是新版本 v${base}，将自动发布 Release"
+            fi
           fi
+
           IFS='.' read -r a b c d <<< "$raw"
           version="${a:-0}.${b:-0}.${c:-0}.${d:-0}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -96,6 +109,8 @@ jobs:
         run: |
           set -euo pipefail
           unzip -l dist/*.zip
+          cat dist/*.md5
+          (cd dist && md5sum -c ./*.md5)
           cat dist/build-info.json
 
       - name: 上传插件包
@@ -104,6 +119,8 @@ jobs:
           name: strm-trickplay-${{ steps.version.outputs.version }}
           path: |
             dist/*.zip
+            dist/*.md5
+            dist/*.sha256
             dist/meta.json
             dist/build-info.json
           if-no-files-found: error
@@ -158,7 +175,7 @@ jobs:
               commit -q -m "chore: 发布 v${VERSION} 插件包与仓库清单 [skip ci]"
           git push origin "HEAD:${BRANCH}"
 
-      - name: 创建 GitHub Release
+      - name: 创建 GitHub Release（附件：插件包 + 校验文件）
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -166,12 +183,30 @@ jobs:
         run: |
           set -euo pipefail
           tag="v${VERSION}"
-          zip="$(python3 -c "import json,pathlib;print(json.loads(pathlib.Path('dist/build-info.json').read_text(encoding='utf-8'))['zip'])")"
+          read_info() {
+            python3 -c "import json,pathlib,sys;print(json.loads(pathlib.Path('dist/build-info.json').read_text(encoding='utf-8')).get(sys.argv[1],''))" "$1"
+          }
+
+          zip="$(read_info zip)"
+          md5file="$(read_info md5File)"
+          shafile="$(read_info sha256File)"
+          assets=("dist/$zip" "dist/build-info.json")
+          if [[ -n "$md5file" && -f "dist/$md5file" ]]; then assets+=("dist/$md5file"); fi
+          if [[ -n "$shafile" && -f "dist/$shafile" ]]; then assets+=("dist/$shafile"); fi
+
+          echo "Release 附件:"; printf '  %s\n' "${assets[@]}"
+
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "dist/$zip" --clobber
+            gh release upload "$tag" "${assets[@]}" --clobber
           else
-            gh release create "$tag" "dist/$zip" --title "$tag" --notes "$(git log -1 --pretty=%B)"
+            target_args=()
+            if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+              target_args=(--target "${GITHUB_SHA}")
+            fi
+            gh release create "$tag" "${target_args[@]}" "${assets[@]}" --title "$tag" \
+              --notes "$(git log -1 --pretty=%B)"
           fi
+          echo "Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
 
       - name: 输出存储库地址
         shell: bash

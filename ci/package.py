@@ -56,6 +56,22 @@ def normalize_version(raw: str) -> str:
     return ".".join(parts)
 
 
+def write_checksum_file(path: Path, digest: str, filename: str) -> None:
+    """写成 md5sum/sha256sum 兼容格式：\"<小写摘要>  <文件名>\"。
+
+    必须显式用 LF 行尾：Windows 上文本模式会写成 CRLF，md5sum 会把 \r 当成文件名的一部分而报
+    \"FAILED open or read\"。
+    """
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(f"{digest.lower()}  {filename}\n")
+
+
+def verify_checksum_file(path: Path, expected: str) -> None:
+    parts = path.read_text(encoding="utf-8").split()
+    if len(parts) < 2 or parts[0].lower() != expected.lower():
+        die(f"{path.name} 内容不正确（应为 <摘要>  <文件名>）")
+
+
 def md5_of(path: Path) -> str:
     return hashlib.md5(path.read_bytes()).hexdigest().upper()
 
@@ -182,8 +198,9 @@ def main() -> int:
         run_build(resolve_dotnet(args.dotnet), project, args.configuration, version)
 
     dist.mkdir(parents=True, exist_ok=True)
-    for old in dist.glob("*.zip"):
-        old.unlink()
+    for pattern in ("*.zip", "*.md5", "*.sha256"):
+        for old in dist.glob(pattern):
+            old.unlink()
 
     copied: list[Path] = []
     for name in plugin["artifacts"]:
@@ -206,6 +223,18 @@ def main() -> int:
         make_zip(zip_path, copied)
         verify_zip(zip_path, {p.name for p in copied}, version)
 
+    md5_value = md5_of(zip_path) if not args.no_zip else ""
+    sha256_value = sha256_of(zip_path) if not args.no_zip else ""
+    md5_file = dist / f"{zip_path.name}.md5"
+    sha256_file = dist / f"{zip_path.name}.sha256"
+
+    if not args.no_zip:
+        # 发布到 Release 的校验文件（可直接 md5sum -c 验证）
+        write_checksum_file(md5_file, md5_value, zip_path.name)
+        write_checksum_file(sha256_file, sha256_value, zip_path.name)
+        verify_checksum_file(md5_file, md5_value)
+        verify_checksum_file(sha256_file, sha256_value)
+
     info = {
         "name": plugin["name"],
         "guid": plugin["guid"],
@@ -215,8 +244,10 @@ def main() -> int:
         "zip": zip_path.name if not args.no_zip else "",
         "zipPath": str(zip_path) if not args.no_zip else "",
         "size": zip_path.stat().st_size if not args.no_zip else 0,
-        "md5": md5_of(zip_path) if not args.no_zip else "",
-        "sha256": sha256_of(zip_path) if not args.no_zip else "",
+        "md5": md5_value,
+        "sha256": sha256_value,
+        "md5File": md5_file.name if not args.no_zip else "",
+        "sha256File": sha256_file.name if not args.no_zip else "",
         "files": [p.name for p in copied],
     }
     (dist / "build-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -224,7 +255,9 @@ def main() -> int:
     log(f"版本    : {version}")
     log(f"元数据  : {meta_path}")
     if not args.no_zip:
-        log(f"插件包  : {zip_path} ({info['size']} bytes, md5={info['md5']})")
+        log(f"插件包  : {zip_path} ({info['size']} bytes)")
+        log(f"MD5     : {md5_value}  -> {md5_file.name}")
+        log(f"SHA256  : {sha256_value}  -> {sha256_file.name}")
     log("完成")
 
     append_github_output(
