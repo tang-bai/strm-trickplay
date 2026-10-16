@@ -42,7 +42,9 @@ check() {
 FAILED=0
 export GITHUB_RUN_NUMBER=42
 export GITHUB_REF=refs/heads/main INPUT_VERSION= INPUT_PUBLISH=
-check "分支 push 自动 dev 版本" "0.1.0.42|false"
+# dev 版本前缀取自 plugin.json 的前三段，避免每次升版本都要改测试
+dev_prefix="$(python3 -c "import json,pathlib;parts=json.loads(pathlib.Path('plugin.json').read_text(encoding='utf-8'))['version'].split('.');print('.'.join((parts+['0','0','0','0'])[:3]))")"
+check "分支 push 自动 dev 版本" "${dev_prefix}.42|false"
 
 export GITHUB_REF=refs/tags/v0.2.0.0
 check "tag v0.2.0.0" "0.2.0.0|true"

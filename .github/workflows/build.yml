@@ -19,6 +19,10 @@ on:
         description: "发布 GitHub Release 并更新插件仓库 manifest"
         type: boolean
         default: false
+      backfill_version:
+        description: "只回填某个已发布版本的 Release 说明（如 0.3.0.0；填了就跳过正常构建）"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -32,8 +36,37 @@ env:
   PYTHONIOENCODING: "utf-8"
 
 jobs:
+  # 手动回填历史版本的 Release 说明（不重新编译）：Actions → Run workflow → backfill_version
+  backfill-notes:
+    name: 回填 Release 说明
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.backfill_version != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 用 CHANGELOG.md 更新对应 Release 说明
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKFILL: ${{ github.event.inputs.backfill_version }}
+        run: |
+          set -euo pipefail
+          version="$(python3 ci/changelog.py --version "$BACKFILL" --print-version)"
+          python3 ci/changelog.py --version "$version" --format full --require > release-notes.md
+          echo "----- v${version} 的更新说明 -----"
+          cat release-notes.md
+          gh release edit "v${version}" --notes-file release-notes.md
+          echo "已更新: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${version}"
+
   build:
     name: 构建与打包
+    if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.backfill_version != '') }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -98,11 +131,51 @@ jobs:
       - name: 解析器冒烟测试
         run: dotnet run --project tests/ParserSmokeTest/ParserSmokeTest.csproj -c Release
 
+      - name: CI 脚本自测（版本判定 / 更新说明提取）
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test_script in ci/tests/*.test.sh; do
+            echo "== $test_script =="
+            bash "$test_script"
+          done
+
+      - name: 提取更新说明
+        id: changelog
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          IS_RELEASE: ${{ steps.version.outputs.is_release }}
+        run: |
+          set -euo pipefail
+          if [[ "$IS_RELEASE" == "true" ]]; then
+            # 发版必须带更新说明：CHANGELOG.md 缺对应小节则直接失败，避免发布"没有说明"的版本
+            python3 ci/changelog.py --version "$VERSION" --format full --require > release-notes.md
+          else
+            # 开发构建：没有小节时回退成提交信息
+            python3 ci/changelog.py --version "$VERSION" --format full > release-notes.md 2>/dev/null || true
+            if [[ ! -s release-notes.md ]]; then
+              printf '开发构建（未发布）：%s\n' "$(git log -1 --pretty=%s)" > release-notes.md
+            fi
+          fi
+          echo "----- 本次版本的更新说明 -----"
+          cat release-notes.md
+          {
+            echo "## 更新说明（v${VERSION}）"
+            echo
+            cat release-notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+          summary="$(python3 ci/changelog.py --version "$VERSION" --format summary 2>/dev/null || true)"
+          if [[ -z "$summary" ]]; then summary="$(git log -1 --pretty=%s)"; fi
+          echo "summary<<CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
+          echo "$summary" >> "$GITHUB_OUTPUT"
+          echo "CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
+
       - name: 构建并打包插件
         shell: bash
         run: |
           set -euo pipefail
-          python3 ci/package.py --version "${{ steps.version.outputs.version }}" --changelog "$(git log -1 --pretty=%s)"
+          python3 ci/package.py --version "${{ steps.version.outputs.version }}" --changelog "${{ steps.changelog.outputs.summary }}"
 
       - name: 展示产物
         shell: bash
@@ -148,6 +221,46 @@ jobs:
           name: strm-trickplay-${{ needs.build.outputs.version }}
           path: dist
 
+      - name: 生成 Release 说明
+        id: notes
+        shell: bash
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          python3 ci/changelog.py --version "$VERSION" --format full --require > release-notes.md
+          summary="$(python3 ci/changelog.py --version "$VERSION" --format summary --require)"
+          md5_line="$(cat dist/*.md5 2>/dev/null || true)"
+          sha_line="$(cat dist/*.sha256 2>/dev/null || true)"
+          {
+            echo
+            echo "---"
+            echo
+            echo "### 安装 / 升级"
+            echo
+            echo "- 已添加插件存储库：Jellyfin 控制台 → 插件 → 目录 → 升级"
+            echo "  （存储库地址 `https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${BRANCH}/docs/manifest.json`）"
+            echo "- 手动安装：下载下方 `strm-trickplay_${VERSION}.zip`，解压到 Jellyfin 插件目录后重启（见 README 第 2 节）"
+            echo
+            echo "### 校验"
+            echo
+            echo '```'
+            [[ -n "$md5_line" ]] && echo "$md5_line"
+            [[ -n "$sha_line" ]] && echo "$sha_line"
+            echo '```'
+          } >> release-notes.md
+          echo "----- Release 说明 -----"
+          cat release-notes.md
+          {
+            echo "## 已发布 v${VERSION}"
+            echo
+            cat release-notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "summary<<CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
+          echo "$summary" >> "$GITHUB_OUTPUT"
+          echo "CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
+
       - name: 更新 docs/（插件包 + 仓库清单）
         shell: bash
         env:
@@ -156,7 +269,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 ci/publish.py --skip-build --version "$VERSION" --branch "$BRANCH" \
-            --changelog "$(git log -1 --pretty=%s)"
+            --changelog "${{ steps.notes.outputs.summary }}"
 
       - name: 提交并推送 docs/
         shell: bash
@@ -198,13 +311,16 @@ jobs:
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "${assets[@]}" --clobber
+            # 同一版本重复发布时，说明也一并刷新，避免留下旧内容
+            gh release edit "$tag" --title "$tag" --notes-file release-notes.md
+            echo "已刷新 Release 说明"
           else
             target_args=()
             if ! git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
               target_args=(--target "${GITHUB_SHA}")
             fi
             gh release create "$tag" "${target_args[@]}" "${assets[@]}" --title "$tag" \
-              --notes "$(git log -1 --pretty=%B)"
+              --notes-file release-notes.md
           fi
           echo "Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
 

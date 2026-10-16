@@ -22,7 +22,7 @@
 
 | 触发方式 | 版本号 | 产物 |
 |---|---|---|
-| **push 新版本**（改了 `plugin.json` 的 version，且远端还没有对应的 `v<版本>` tag） | `plugin.json` 里的版本，如 `0.2.0.0` | ① 自动创建 **GitHub Release**（附 zip + MD5/SHA256 校验文件）② 更新 `docs/` 并提交回主分支 ③ 日志里打印存储库地址 |
+| **push 新版本**（改了 `plugin.json` 的 version，且远端还没有对应的 `v<版本>` tag） | `plugin.json` 里的版本，如 `0.2.0.0` | ① 自动创建 **GitHub Release**（正文 = `CHANGELOG.md` 里该版本的说明，附 zip + MD5/SHA256 校验文件）② 更新 `docs/` 并提交回主分支 ③ 日志里打印存储库地址 |
 | **push 同一版本**（远端已有该 tag） | `<前三段>.<run_number>`，如 `0.2.0.37` | 只产出 Workflow artifact（重复 push 不会刷屏 Releases） |
 | **推 tag `v0.2.0.0`** | `0.2.0.0` | 同上（等效于手动指定版本发版） |
 | **Pull Request** | dev 版本 | 只构建 + 跑测试，永不发版 |
@@ -39,7 +39,7 @@
 | `strm-trickplay_<版本>.zip.sha256` | sha256sum 格式 | `sha256sum -c xxx.zip.sha256` |
 | `build-info.json` | 版本 / targetAbi / 大小 / MD5 / SHA256（机器可读） | 供脚本比对 |
 
-流程里有三道质量闸门：**还原依赖 → 解析器冒烟测试（21 项断言）→ 打包后回读校验**（zip 内 `meta.json` 版本、zip 完整性、DLL 版本、校验文件格式）。
+流程里有五道质量闸门：**还原依赖 → 解析器冒烟测试（30 项断言）→ CI 脚本自测**（版本判定 / 发版判定 / 更新说明解析）**→ 发版必须有更新说明**（缺 `CHANGELOG.md` 小节即失败）**→ 打包后回读校验**（zip 内 `meta.json` 版本、zip 完整性、DLL 版本、校验文件格式）。
 
 > `docs/` 是 Jellyfin 的分发通道（zip + manifest 同目录）；Release 是给人看的下载与校验入口。
 > 每次发版 `docs/` 只增加约 35 KB。
@@ -81,15 +81,59 @@ git add plugin.json && git commit -m "chore: bump version to 0.2.0.0" && git pus
 
 ---
 
-## 5. 本地复现
+## 5. 发版说明（Release 正文写什么）
+
+**每次发版都必须有更新说明**，来源只有一个文件：仓库根目录的 [CHANGELOG.md](CHANGELOG.md)。
+
+```markdown
+## [0.4.0.0] - 2026-10-17
+### 变更摘要
+一句话说明这个版本干了什么（会显示在 Jellyfin 插件目录的版本列表里）
+
+### 新增
+- 面向用户的新能力
+```
+
+一次编写、三处生效（都由 CI 自动同步）：
+
+| 位置 | 内容 |
+|---|---|
+| **GitHub Release 正文** | 该版本小节的完整内容 + 安装/升级方式 + 本次 zip 的 MD5 / SHA256 |
+| **Jellyfin 插件目录** | `### 变更摘要` 那一行（没有时取第一条列表项），写进 `manifest.json` 的 `changelog` |
+| **构建产物 `meta.json`** | 同上，跟随 zip 一起进插件目录 |
+
+另外，**Actions 运行页面（Summary）与构建日志**里都会直接打印本次版本的更新说明；本地 `build.ps1` 也会打印。
+
+规则：
+
+* 发版（改 `plugin.json` 版本号后 push）时若 `CHANGELOG.md` 缺少对应小节 → **构建直接失败**，不会产生"没有说明"的 Release；
+* 开发构建（同版本重复 push、PR）不需要小节，自动退化成提交信息；
+* 版本号 1~4 段等价（`0.4` 与 `0.4.0.0` 视为同一个）；标题里的方括号、`v` 前缀、日期都可省略；
+* 重复发布同一版本（例如手动重跑工作流）时，Release 说明会一并刷新。
+
+**回填历史版本的说明**（不需要重新编译）：**Actions → Build plugin → Run workflow**，把 `backfill_version` 填成例如 `0.3.0.0`，运行后会直接用 `CHANGELOG.md` 更新该 Release 的正文。
+
+本地检查：
+
+```bash
+python ci/changelog.py --list                         # 已记录哪些版本
+python ci/changelog.py --version 0.4.0.0              # 该版本的完整说明
+python ci/changelog.py --version 0.4.0.0 --format summary
+python ci/changelog.py --version 0.4.0.0 --require    # 缺失时以退出码 3 失败（CI 用的就是这个）
+bash ci/tests/changelog.test.sh                       # 解析逻辑自测（13 项断言）
+```
+
+---
+
+## 6. 本地复现
 
 ```powershell
 # 编译 + 打包（版本默认取 plugin.json，产物在 dist/）
 .\build.ps1
 .\build.ps1 -Version 0.2.0.0
 
-# 等价命令（任何平台）
-python ci/package.py --version 0.2.0.0 --changelog "本次改动说明"
+# 等价命令（任何平台）；更新说明直接取 CHANGELOG.md 里该版本的内容
+python ci/package.py --version 0.2.0.0 --changelog "$(python ci/changelog.py --version 0.2.0.0 --format summary)"
 
 # 把包与清单发布到 docs/（CI 发版时做的就是这一步）
 python ci/publish.py --version 0.2.0.0 --changelog "本次改动说明"
@@ -115,7 +159,7 @@ python ci/repo.py --zip docs/strm-trickplay_0.2.0.0.zip --version 0.2.0.0 \
 
 ---
 
-## 6. 换成别的平台（Gitea / GitLab / Jenkins）
+## 7. 换成别的平台（Gitea / GitLab / Jenkins）
 
 `ci/package.py`、`ci/publish.py`、`ci/repo.py` 只用 Python 标准库，平台无关。要点：
 
@@ -125,7 +169,7 @@ python ci/repo.py --zip docs/strm-trickplay_0.2.0.0.zip --version 0.2.0.0 \
 
 ---
 
-## 7. 常见问题
+## 8. 常见问题
 
 | 现象 | 原因 / 处理 |
 |---|---|
@@ -138,3 +182,5 @@ python ci/repo.py --zip docs/strm-trickplay_0.2.0.0.zip --version 0.2.0.0 \
 | push 后没有自动发版 | 该版本已发布过（远端已有 `v<版本>` tag）；想发新版请改 `plugin.json` 的 version |
 | Release 里没有 md5 文件 | 那是旧流程建的 Release；重新发一次版本即可（新流程必定带上 zip + md5 + sha256） |
 | 想只发版不更新 docs | 不需要：docs/ 只在发版时更新，日常 push 只产出 artifact |
+| 发版时构建失败，提示"CHANGELOG.md 里找不到版本 x.y.z.w 的更新说明" | 按提示先在 `CHANGELOG.md` 补一节（标题 `## [x.y.z.w] - 日期`），再 push |
+| 历史 Release 的说明还是提交信息 | Actions → Run workflow，`backfill_version` 填该版本号即可回填（见第 5 节） |

@@ -1,7 +1,7 @@
 {
   "name": "STRM Trickplay",
   "guid": "3f9a7c14-5b62-4d8e-9a10-7c6e2f5b8d31",
-  "version": "0.3.0.0",
+  "version": "0.4.0.0",
   "targetAbi": "12.2.0.0",
   "framework": "net10.0",
   "category": "General",

@@ -429,7 +429,8 @@ if (!item.IsShortcut || options.EnableRemoteContentProbe) { mediaInfoResult = aw
 
 | 文档 | 内容 |
 |---|---|
-| [CI.md](CI.md) | 自动化构建与发版：push 新版本自动出 Release（zip + MD5/SHA256）、存储库清单如何生成、本地复现命令 |
+| [CHANGELOG.md](CHANGELOG.md) | 每个版本改了什么；**发版说明的唯一来源**（Release 正文与 Jellyfin 目录里的 changelog 都取这里） |
+| [CI.md](CI.md) | 自动化构建与发版：push 新版本自动出 Release（zip + MD5/SHA256 + 更新说明）、存储库清单如何生成、本地复现命令 |
 | [TEST-REPORT.md](TEST-REPORT.md) | 在真实 Jellyfin 12.2.0 上的实测记录（命令与原始输出） |
 | [PLAN.md](PLAN.md) | 方案设计与源码级依据 |
 
