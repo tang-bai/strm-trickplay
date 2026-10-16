@@ -68,4 +68,41 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets a value indicating whether the (future) ffmpeg generator is allowed to run for strm items.
     /// </summary>
     public bool EnableGeneration { get; set; }
+
+    // —————— STRM 媒体信息探测（补齐时长 / 编码 / 分辨率 / 音轨）——————
+
+    /// <summary>
+    /// Gets or sets a value indicating whether STRM media info probing is enabled at all.
+    /// </summary>
+    public bool EnableMediaProbe { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether newly added strm items are probed automatically during library scans.
+    /// </summary>
+    public bool EnableProbeOnItemAdded { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the debounce delay (seconds) before a catch-up batch is probed, so a scan's burst of ItemAdded events is batched.
+    /// </summary>
+    public int ProbeDebounceSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Gets or sets the number of parallel probe operations (1-20).
+    /// </summary>
+    public int ProbeParallelism { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the per-item probe timeout in seconds (5-600).
+    /// </summary>
+    public int ProbeTimeoutSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// Gets or sets the cooldown delay in milliseconds between probes, to avoid hammering the upstream storage (0-10000).
+    /// </summary>
+    public int ProbeCooldownMs { get; set; } = 200;
+
+    /// <summary>
+    /// Gets or sets the library names to probe. Empty means all libraries.
+    /// </summary>
+    public string[] ProbeLibraryNames { get; set; } = [];
 }

@@ -2,11 +2,16 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Jellyfin.Plugin.StrmTrickplay.Probe;
+using Jellyfin.Plugin.StrmTrickplay.Tasks;
 using Jellyfin.Plugin.StrmTrickplay.Trickplay;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Model.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -30,6 +35,8 @@ public sealed class StrmTrickplayController : ControllerBase
     private readonly ISidecarTrickplayIndex _index;
     private readonly SidecarTrickplayParser _parser;
     private readonly IApplicationPaths _applicationPaths;
+    private readonly IStrmProbeService _probeService;
+    private readonly ITaskManager _taskManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="StrmTrickplayController"/> class.
@@ -38,12 +45,16 @@ public sealed class StrmTrickplayController : ControllerBase
         ILibraryManager libraryManager,
         ISidecarTrickplayIndex index,
         SidecarTrickplayParser parser,
-        IApplicationPaths applicationPaths)
+        IApplicationPaths applicationPaths,
+        IStrmProbeService probeService,
+        ITaskManager taskManager)
     {
         _libraryManager = libraryManager;
         _index = index;
         _parser = parser;
         _applicationPaths = applicationPaths;
+        _probeService = probeService;
+        _taskManager = taskManager;
     }
 
     /// <summary>
@@ -71,7 +82,27 @@ public sealed class StrmTrickplayController : ControllerBase
             unknownRuntimeCacheSeconds = config.UnknownRuntimeCacheSeconds,
             verboseLogging = config.VerboseLogging,
             cachedItems = _index.CachedItemCount,
-            trickplayManagerType = typeof(Trickplay.StrmTrickplayManager).FullName
+            trickplayManagerType = typeof(Trickplay.StrmTrickplayManager).FullName,
+            mediaProbe = new
+            {
+                enabled = config.EnableMediaProbe,
+                probeOnItemAdded = config.EnableProbeOnItemAdded,
+                debounceSeconds = config.ProbeDebounceSeconds,
+                parallelism = config.ProbeParallelism,
+                timeoutSeconds = config.ProbeTimeoutSeconds,
+                cooldownMs = config.ProbeCooldownMs,
+                libraries = config.ProbeLibraryNames,
+                queuedItems = _probeService.QueuedCount,
+                lastRun = _probeService.LastRun is null ? null : new
+                {
+                    trigger = _probeService.LastRun.Trigger,
+                    startedAt = _probeService.LastRun.StartedAt,
+                    finishedAt = _probeService.LastRun.FinishedAt,
+                    total = _probeService.LastRun.Total,
+                    probed = _probeService.LastRun.Probed,
+                    failed = _probeService.LastRun.Failed
+                }
+            }
         });
     }
 
@@ -270,6 +301,94 @@ public sealed class StrmTrickplayController : ControllerBase
         {
             return StatusCode(500, new { error = ex.Message, testRoot = root });
         }
+    }
+
+    /// <summary>
+    /// 探测状态：待探测数量（可选统计，较慢）、队列长度、最近一次运行结果。
+    /// </summary>
+    /// <param name="count">是否顺便统计全库待探测条目数（默认 false，大库较慢）。</param>
+    /// <returns>Probe status payload.</returns>
+    [HttpGet("Probe/Status")]
+    public ActionResult GetProbeStatus([FromQuery] bool count = false)
+    {
+        var config = Plugin.CurrentConfiguration;
+
+        return Ok(new
+        {
+            enabled = config.EnableMediaProbe,
+            probeOnItemAdded = config.EnableProbeOnItemAdded,
+            debounceSeconds = config.ProbeDebounceSeconds,
+            parallelism = config.ProbeParallelism,
+            timeoutSeconds = config.ProbeTimeoutSeconds,
+            cooldownMs = config.ProbeCooldownMs,
+            libraries = config.ProbeLibraryNames,
+            queuedItems = _probeService.QueuedCount,
+            lastRun = _probeService.LastRun is null ? null : new
+            {
+                trigger = _probeService.LastRun.Trigger,
+                startedAt = _probeService.LastRun.StartedAt,
+                finishedAt = _probeService.LastRun.FinishedAt,
+                total = _probeService.LastRun.Total,
+                probed = _probeService.LastRun.Probed,
+                failed = _probeService.LastRun.Failed
+            },
+            unprobedItems = count ? _probeService.GetUnprobedItems().Count : (int?)null
+        });
+    }
+
+    /// <summary>
+    /// 立即探测单个条目，并返回探测前后的时长 / 媒体流数量。
+    /// </summary>
+    /// <param name="itemId">Item id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Probe result.</returns>
+    [HttpPost("Probe/Item/{itemId}")]
+    public async Task<ActionResult> ProbeItem([FromRoute] Guid itemId, CancellationToken cancellationToken)
+    {
+        var item = _libraryManager.GetItemById(itemId);
+        if (item is null)
+        {
+            return NotFound(new { error = "item not found" });
+        }
+
+        var result = await _probeService.ProbeItemAsync(item, cancellationToken).ConfigureAwait(false);
+
+        return Ok(new
+        {
+            itemId = itemId.ToString("N", CultureInfo.InvariantCulture),
+            name = item.Name,
+            needsProbe = _probeService.NeedsProbe(item),
+            success = result.Success,
+            reason = result.Reason,
+            runTimeBefore = result.RunTimeBefore,
+            runTimeAfter = result.RunTimeAfter,
+            runTimeSeconds = result.RunTimeAfter is null ? null : (double?)(result.RunTimeAfter / (double)TimeSpan.TicksPerSecond),
+            streamsBefore = result.StreamsBefore,
+            streamsAfter = result.StreamsAfter
+        });
+    }
+
+    /// <summary>
+    /// 把「探测 STRM 媒体信息」计划任务排入队列（立即后台执行）。
+    /// </summary>
+    /// <returns>Queued flag.</returns>
+    [HttpPost("Probe/Run")]
+    public ActionResult QueueProbeTask()
+    {
+        _taskManager.QueueIfNotRunning<ProbeStrmMediaInfoTask>();
+        return Ok(new { queued = true, task = "探测 STRM 媒体信息" });
+    }
+
+    /// <summary>
+    /// 把「刷新 STRM Trickplay 索引」计划任务排入队列。
+    /// </summary>
+    /// <returns>Queued flag.</returns>
+    [HttpPost("Index/Rebuild")]
+    public ActionResult QueueIndexRebuild()
+    {
+        _index.Clear();
+        _taskManager.QueueIfNotRunning<RefreshStrmTrickplayIndexTask>();
+        return Ok(new { queued = true, task = "刷新 STRM Trickplay 索引" });
     }
 
     private static bool SafeExists(string path)

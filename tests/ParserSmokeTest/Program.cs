@@ -1,4 +1,8 @@
 using Jellyfin.Plugin.StrmTrickplay.Configuration;
+using Jellyfin.Plugin.StrmTrickplay.Probe;
+using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Providers;
+using MediaBrowser.Model.Entities;
 using Jellyfin.Plugin.StrmTrickplay.Trickplay;
 using MediaBrowser.Controller.Drawing;
 using MediaBrowser.Controller.Entities.Movies;
@@ -135,6 +139,41 @@ var s9 = Single("Standard", TimeSpan.FromHours(2).Ticks);
 Console.WriteLine("  " + s9);
 Check("intervalInRange", s9.Interval >= 1000, s9.Interval.ToString());
 Check("countClamped", s9.ThumbnailCount >= 201 && s9.ThumbnailCount <= 300, s9.ThumbnailCount.ToString());
+
+Console.WriteLine("\n=== 用例 10：STRM 媒体信息探测的「是否需要探测」判定 ===");
+var mediaSourceManager = new Mock<IMediaSourceManager>();
+var streamMap = new Dictionary<Guid, IReadOnlyList<MediaStream>>();
+mediaSourceManager
+    .Setup(m => m.GetMediaStreams(It.IsAny<Guid>()))
+    .Returns<Guid>(id => streamMap.TryGetValue(id, out var list) ? list : new List<MediaStream>());
+
+var probeService = new StrmProbeService(
+    new Mock<IProviderManager>().Object,
+    new Mock<ILibraryManager>().Object,
+    mediaSourceManager.Object,
+    new Mock<IDirectoryService>().Object,
+    new Mock<ISidecarTrickplayIndex>().Object,
+    NullLogger<StrmProbeService>.Instance);
+
+var strmNoData = new Movie { Id = Guid.NewGuid(), Path = Path.Combine(root, "probe-a.strm"), IsShortcut = true };
+Check("strm 无媒体流 => 需要探测", probeService.NeedsProbe(strmNoData), "true");
+
+var mkvItem = new Movie { Id = Guid.NewGuid(), Path = Path.Combine(root, "probe-b.mkv") };
+Check("非 strm => 不探测", !probeService.NeedsProbe(mkvItem), "false");
+
+var strmNoRuntime = new Movie { Id = Guid.NewGuid(), Path = Path.Combine(root, "probe-c.strm"), IsShortcut = true };
+streamMap[strmNoRuntime.Id] = [new MediaStream { Type = MediaStreamType.Video, Codec = "h264" }];
+Check("strm 有媒体流但无时长 => 仍要探测", probeService.NeedsProbe(strmNoRuntime), "true");
+
+var strmComplete = new Movie
+{
+    Id = Guid.NewGuid(),
+    Path = Path.Combine(root, "probe-d.strm"),
+    IsShortcut = true,
+    RunTimeTicks = TimeSpan.FromMinutes(90).Ticks
+};
+streamMap[strmComplete.Id] = [new MediaStream { Type = MediaStreamType.Video, Codec = "hevc" }];
+Check("strm 有媒体流且有时长 => 不探测", !probeService.NeedsProbe(strmComplete), "false");
 
 Console.WriteLine();
 if (failures.Count == 0)
