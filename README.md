@@ -5,7 +5,7 @@
 | 项目 | 值 |
 |---|---|
 | 适配 | **Jellyfin 12.2**（`targetAbi 12.2.0.0`，.NET 10） |
-| 当前版本 | **0.5.1.0** —— 每个版本改了什么见 [CHANGELOG.md](CHANGELOG.md) |
+| 当前版本 | **0.5.2.0** —— 每个版本改了什么见 [CHANGELOG.md](CHANGELOG.md) |
 | 三项能力 | ① 进度条预览（trickplay） ② 媒体信息探测（时长/编码/分辨率） ③ 起播加速 |
 | 插件存储库 | `https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/manifest.json` |
 | 实测状态 | 已在真实 **Jellyfin 12.2.0** 服务端逐项验证，命令与原始输出见 [TEST-REPORT.md](TEST-REPORT.md) |

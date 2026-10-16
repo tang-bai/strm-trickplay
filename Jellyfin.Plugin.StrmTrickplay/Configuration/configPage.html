@@ -57,6 +57,9 @@
         #StrmTrickplayConfigPage .cfgChevron { flex: 0 0 auto; opacity: .65; transition: transform .15s ease; font-size: .9em; }
         #StrmTrickplayConfigPage .cfgBoxBody { padding: .9em 1.05em .25em; }
         #StrmTrickplayConfigPage .cfgBoxBody > .fieldDescription:first-child { margin-top: 0; }
+        #StrmTrickplayConfigPage .cfgBoxBody > .fieldDescription { margin-bottom: 1.1em; }
+        #StrmTrickplayConfigPage .cfgBoxBody > .inputContainer:last-child .fieldDescription,
+        #StrmTrickplayConfigPage .cfgBoxBody > .checkboxContainer:last-child .fieldDescription { margin-bottom: 0; }
         #StrmTrickplayConfigPage .cfgBoxBody .inputContainer:last-child,
         #StrmTrickplayConfigPage .cfgBoxBody .checkboxContainer:last-child { margin-bottom: .55em; }
 
@@ -66,10 +69,16 @@
         #StrmTrickplayConfigPage .cfgTopActions { margin-left: auto; display: flex; flex-wrap: wrap; gap: .5em; }
 
         /* —— 栅格与列表 —— */
-        #StrmTrickplayConfigPage .cfgGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0 1.2em; }
-        #StrmTrickplayConfigPage .cfgGrid-wide { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 1.2em; }
+        #StrmTrickplayConfigPage .cfgGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 1.2em; }
+        #StrmTrickplayConfigPage .cfgGrid-wide { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0 1.2em; }
+        /* 关键：栅格项默认最小宽度 = 内容宽度，会把轨道撑开导致换行不整齐 */
+        #StrmTrickplayConfigPage .cfgGrid > *,
+        #StrmTrickplayConfigPage .cfgGrid-wide > * { min-width: 0; }
+        #StrmTrickplayConfigPage .cfgGrid,
+        #StrmTrickplayConfigPage .cfgGrid-wide { margin-bottom: .5em; }
         #StrmTrickplayConfigPage .statusGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: .2em 1.5em; }
-        #StrmTrickplayConfigPage .statusGrid > div { padding: .18em 0; }
+        #StrmTrickplayConfigPage .statusGrid > div { padding: .18em 0; min-width: 0; overflow-wrap: anywhere; }
+        #StrmTrickplayConfigPage .statusGrid > div.cfgSpan { grid-column: 1 / -1; }
         #StrmTrickplayConfigPage .statusGrid b { font-weight: 600; }
         #StrmTrickplayConfigPage .libList { max-height: 15em; overflow: auto; border: 1px solid var(--cfg-line-soft); border-radius: 6px; padding: .3em .9em; }
         #StrmTrickplayConfigPage .libList .checkboxContainer { margin: .35em 0; }
@@ -229,15 +238,15 @@
                                 </label>
                                 <div class="fieldDescription">库扫描新增条目后按防抖时间凑批探测，不必手动跑任务。</div>
                             </div>
-                            <div class="checkboxContainer checkboxContainer-withDescription">
-                                <label>
-                                    <input is="emby-checkbox" type="checkbox" id="EnableFastStartup" />
-                                    <span><b>起播加速</b>：信息已完整的 .strm 点播时跳过重复探测</span>
-                                </label>
-                                <div class="fieldDescription">
-                                    核心对<b>每个</b> .strm 在每次点播时都会强制跑一次远端 ffprobe（按路径后缀判断，与信息是否齐全无关）。
-                                    只有"确实是 .strm + 已有对应媒体流 + 已知时长"三条同时满足才跳过，其余原样探测。
-                                </div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="EnableFastStartup" />
+                                <span><b>起播加速</b>：信息已完整的 .strm 点播时跳过核心的重复探测</span>
+                            </label>
+                            <div class="fieldDescription">
+                                核心对<b>每个</b> .strm 在每次点播时都会强制跑一次远端 ffprobe（按路径后缀判断，与信息是否齐全无关）。
+                                只有"确实是 .strm + 已有对应媒体流 + 已知时长"三条同时满足才跳过，其余原样探测。
                             </div>
                         </div>
 
@@ -328,7 +337,7 @@
         (function () {
             var pluginId = '3f9a7c14-5b62-4d8e-9a10-7c6e2f5b8d31';
             var apiBase = 'Plugins/StrmTrickplay';
-            var collapseKeyPrefix = 'strmTrickplay.collapsed.';
+            var collapseKeyPrefix = 'strmTrickplay.collapsed.v2.';
             var defaults = {
                 Enabled: true,
                 SidecarFolderNames: ['{name}.trickplay', 'trickplay'],
@@ -418,9 +427,11 @@
                         ['起播加速', ((s.fastStartup && s.fastStartup.enabled) ? '已启用' : '已关闭')],
                         ['ITrickplayManager', s.trickplayManagerType || '-']
                     ];
+                    var wideRows = { 'ITrickplayManager': 1, '最近一次探测': 1 };
                     var html = '';
                     for (var i = 0; i < rows.length; i++) {
-                        html += '<div><b>' + rows[i][0] + '</b>：' + rows[i][1] + '</div>';
+                        var wide = wideRows[rows[i][0]] ? ' class="cfgSpan"' : '';
+                        html += '<div' + wide + '><b>' + rows[i][0] + '</b>：' + rows[i][1] + '</div>';
                     }
                     el('statusGrid').innerHTML = html;
                 }).catch(function () {
