@@ -9,6 +9,16 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.5.3.0",
+        "changelog": "修复设置页字段被挤在左侧一小块、第 4 个数字项换行：控制台把 <form> 收缩成了内容宽",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/strm-trickplay_0.5.3.0.zip",
+        "checksum": "7E1BED346CAE623F6EF3D700AD991B89",
+        "timestamp": "2026-10-16T23:37:53.1186010Z",
+        "repositoryName": "STRM Trickplay",
+        "repositoryUrl": "https://github.com/tang-bai/strm-trickplay"
+      },
+      {
         "version": "0.5.2.0",
         "changelog": "设置页排版收尾：栅格不再乱换行、状态卡长文本不再被截断、区块间距与复选框布局整理",
         "targetAbi": "12.2.0.0",
