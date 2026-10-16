@@ -9,6 +9,16 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.4.1.0",
+        "changelog": "修正 Release 说明的格式（多余分隔线、被 shell 吃掉的地址与文件名），并修好本地 build.ps1",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/strm-trickplay_0.4.1.0.zip",
+        "checksum": "5F319DCAB69A7BF147E7AD96048C2961",
+        "timestamp": "2026-10-16T22:27:34.5178160Z",
+        "repositoryName": "STRM Trickplay",
+        "repositoryUrl": "https://github.com/tang-bai/strm-trickplay"
+      },
+      {
         "version": "0.4.0.0",
         "changelog": "发版说明自动化：每次发布 Release 都会带上完整更新内容，并在构建/发版页面直接显示",
         "targetAbi": "12.2.0.0",
