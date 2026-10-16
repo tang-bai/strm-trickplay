@@ -1,11 +1,11 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8" />
     <title>STRM Trickplay</title>
 </head>
 <body>
-<div id="StrmTrickplayConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+<div id="StrmTrickplayConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-textarea,emby-button,emby-checkbox">
     <style>
         /* 颜色全部用中性灰半透明 + 主题色兜底，明暗主题都能用，不写死具体配色 */
         #StrmTrickplayConfigPage { --cfg-line: rgba(128,128,128,.35); --cfg-line-soft: rgba(128,128,128,.22); --cfg-fill: rgba(128,128,128,.06); --cfg-fill-strong: rgba(128,128,128,.12); --cfg-accent: var(--theme-primary-color, var(--accent, #00a4dc)); }
@@ -86,6 +86,7 @@
             word-break: break-word;
             font-size: .85em;
         }
+        #StrmTrickplayConfigPage .cfgFieldLabel { display: block; margin-bottom: .35em; font-size: .95em; opacity: .9; }
         #StrmTrickplayConfigPage .cfgMini { font-size: .86em; opacity: .75; }
     </style>
 
@@ -144,8 +145,7 @@
                     </div>
                     <div class="cfgBoxBody">
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="SidecarFolderNames">侧车目录名（每行一个，{name} 代表媒体文件名）</label>
-                            <textarea is="emby-textarea" id="SidecarFolderNames" class="emby-textarea" rows="3"></textarea>
+                            <textarea is="emby-textarea" id="SidecarFolderNames" label="侧车目录名（每行一个，{name} 代表媒体文件名）" rows="3"></textarea>
                             <div class="fieldDescription">
                                 默认 <code>{name}.trickplay</code> 与 <code>trickplay</code>。目录内规范：
                                 <code>&lt;宽&gt; - &lt;每行张数&gt;x&lt;每列张数&gt;/&lt;序号&gt;.jpg</code>，例如 <code>320 - 10x10/0.jpg</code>。
@@ -160,20 +160,16 @@
                         </div>
                         <div class="cfgGrid">
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="DefaultWidth">兜底缩略图宽度（px）</label>
-                                <input is="emby-input" type="number" id="DefaultWidth" class="emby-input" />
+                                <input is="emby-input" type="number" id="DefaultWidth" label="兜底缩略图宽度（px）" />
                             </div>
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="DefaultTileWidth">兜底瓦片网格宽</label>
-                                <input is="emby-input" type="number" id="DefaultTileWidth" class="emby-input" />
+                                <input is="emby-input" type="number" id="DefaultTileWidth" label="兜底瓦片网格宽" />
                             </div>
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="DefaultTileHeight">兜底瓦片网格高</label>
-                                <input is="emby-input" type="number" id="DefaultTileHeight" class="emby-input" />
+                                <input is="emby-input" type="number" id="DefaultTileHeight" label="兜底瓦片网格高" />
                             </div>
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="IntervalOverrideMs">强制缩略图间隔（毫秒，0=自动）</label>
-                                <input is="emby-input" type="number" id="IntervalOverrideMs" class="emby-input" />
+                                <input is="emby-input" type="number" id="IntervalOverrideMs" label="强制缩略图间隔（毫秒，0=自动）" />
                             </div>
                         </div>
                         <div class="fieldDescription">
@@ -192,16 +188,13 @@
                     <div class="cfgBoxBody">
                         <div class="cfgGrid">
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="CacheSeconds">命中缓存（秒）</label>
-                                <input is="emby-input" type="number" id="CacheSeconds" class="emby-input" />
+                                <input is="emby-input" type="number" id="CacheSeconds" label="命中缓存（秒）" />
                             </div>
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="EmptyCacheSeconds">未命中缓存（秒）</label>
-                                <input is="emby-input" type="number" id="EmptyCacheSeconds" class="emby-input" />
+                                <input is="emby-input" type="number" id="EmptyCacheSeconds" label="未命中缓存（秒）" />
                             </div>
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="UnknownRuntimeCacheSeconds">未知时长缓存（秒）</label>
-                                <input is="emby-input" type="number" id="UnknownRuntimeCacheSeconds" class="emby-input" />
+                                <input is="emby-input" type="number" id="UnknownRuntimeCacheSeconds" label="未知时长缓存（秒）" />
                             </div>
                         </div>
                         <div class="fieldDescription">.strm 的时长常常探测不到，此时用较短的"未知时长缓存"；等探测补齐时长后会自动按官方算法重算间隔。</div>
@@ -250,25 +243,21 @@
 
                         <div class="cfgGrid">
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="ProbeParallelism">并发数（1-20）</label>
-                                <input is="emby-input" type="number" id="ProbeParallelism" class="emby-input" />
+                                <input is="emby-input" type="number" id="ProbeParallelism" label="并发数（1-20）" />
                             </div>
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="ProbeTimeoutSeconds">单项超时（秒，5-600）</label>
-                                <input is="emby-input" type="number" id="ProbeTimeoutSeconds" class="emby-input" />
+                                <input is="emby-input" type="number" id="ProbeTimeoutSeconds" label="单项超时（秒，5-600）" />
                             </div>
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="ProbeCooldownMs">探测间隔（毫秒，0-10000）</label>
-                                <input is="emby-input" type="number" id="ProbeCooldownMs" class="emby-input" />
+                                <input is="emby-input" type="number" id="ProbeCooldownMs" label="探测间隔（毫秒，0-10000）" />
                             </div>
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="ProbeDebounceSeconds">防抖时间（秒）</label>
-                                <input is="emby-input" type="number" id="ProbeDebounceSeconds" class="emby-input" />
+                                <input is="emby-input" type="number" id="ProbeDebounceSeconds" label="防抖时间（秒）" />
                             </div>
                         </div>
 
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused">探测范围（不勾选 = 全部媒体库）</label>
+                            <div class="cfgFieldLabel">探测范围（不勾选 = 全部媒体库）</div>
                             <div id="libraryList" class="libList">加载中…</div>
                             <div class="fieldDescription">网盘直链探测会产生一定下行流量，建议先只勾选一两个库试跑。</div>
                         </div>

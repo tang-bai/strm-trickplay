@@ -55,6 +55,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             new PluginPageInfo
             {
                 Name = "StrmTrickplay",
+                DisplayName = Name,
+
+                // 在控制台左侧菜单的「插件」分类里出现一个入口，点进去就是本插件设置页
+                EnableInMainMenu = true,
+                MenuIcon = "movie",
                 EmbeddedResourcePath = string.Format(
                     CultureInfo.InvariantCulture,
                     "{0}.Configuration.configPage.html",
