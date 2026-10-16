@@ -9,6 +9,16 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.4.0.0",
+        "changelog": "发版说明自动化：每次发布 Release 都会带上完整更新内容，并在构建/发版页面直接显示",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/strm-trickplay_0.4.0.0.zip",
+        "checksum": "C7AA1716504E01938651F62B1754DEC2",
+        "timestamp": "2026-10-16T22:25:49.1193370Z",
+        "repositoryName": "STRM Trickplay",
+        "repositoryUrl": "https://github.com/tang-bai/strm-trickplay"
+      },
+      {
         "version": "0.3.0.0",
         "changelog": "feat: 起播加速（IMediaSourceManager 装饰器跳过点播时重复的远端探测）；版本 0.3.0.0",
         "targetAbi": "12.2.0.0",
