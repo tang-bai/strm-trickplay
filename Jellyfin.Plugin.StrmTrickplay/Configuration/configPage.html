@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <title>STRM Trickplay</title>
+</head>
+<body>
+<div id="StrmTrickplayConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+    <div data-role="content">
+        <div class="content-primary">
+            <div class="sectionTitleContainer flex align-items-center">
+                <h2 class="sectionTitle">STRM Trickplay</h2>
+            </div>
+            <p class="fieldDescription">
+                读取 .strm 同级目录下已经生成好的瓦片目录：
+                <code>&lt;文件名&gt;.trickplay/&lt;宽&gt; - &lt;瓦片宽&gt;x&lt;瓦片高&gt;/&lt;序号&gt;.jpg</code>
+                （与 Jellyfin 原生 SaveTrickplayWithMedia 完全一致），并在播放时提供进度条预览。
+            </p>
+
+            <form id="StrmTrickplayConfigForm">
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="Enabled" />
+                        <span>启用插件</span>
+                    </label>
+                    <div class="fieldDescription">关闭后完全透传 Jellyfin 核心行为（.strm 将没有预览图）。</div>
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="SidecarFolderNames">侧车目录名（每行一个，{name} 代表媒体文件名）</label>
+                    <textarea is="emby-textarea" id="SidecarFolderNames" class="emby-textarea" rows="3"></textarea>
+                    <div class="fieldDescription">默认：{name}.trickplay 与 trickplay。</div>
+                </div>
+
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="AllowAnySiblingTrickplayFolder" />
+                        <span>允许同目录下任意 *.trickplay 目录作为兜底</span>
+                    </label>
+                    <div class="fieldDescription">媒体文件被改名后仍能找到瓦片（可能误匹配，默认关闭）。</div>
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="DefaultWidth">兜底缩略图宽度（目录名没有宽度信息时使用）</label>
+                    <input is="emby-input" type="number" id="DefaultWidth" class="emby-input" />
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="DefaultTileWidth">兜底瓦片网格宽</label>
+                    <input is="emby-input" type="number" id="DefaultTileWidth" class="emby-input" />
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="DefaultTileHeight">兜底瓦片网格高</label>
+                    <input is="emby-input" type="number" id="DefaultTileHeight" class="emby-input" />
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="IntervalOverrideMs">强制缩略图间隔（毫秒，0 = 自动推断）</label>
+                    <input is="emby-input" type="number" id="IntervalOverrideMs" class="emby-input" />
+                    <div class="fieldDescription">自动推断会结合视频时长夹逼，并优先采用服务器 trickplay 的 Interval 设置。</div>
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="CacheSeconds">命中缓存时间（秒）</label>
+                    <input is="emby-input" type="number" id="CacheSeconds" class="emby-input" />
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="EmptyCacheSeconds">未命中缓存时间（秒）</label>
+                    <input is="emby-input" type="number" id="EmptyCacheSeconds" class="emby-input" />
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="UnknownRuntimeCacheSeconds">未知时长时的缓存时间（秒）</label>
+                    <input is="emby-input" type="number" id="UnknownRuntimeCacheSeconds" class="emby-input" />
+                    <div class="fieldDescription">.strm 的远端时长常常探测不到，用较短缓存以便时长可知后自动重算间隔。</div>
+                </div>
+
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="VerboseLogging" />
+                        <span>输出详细日志</span>
+                    </label>
+                    <div class="fieldDescription">排查问题时打开。</div>
+                </div>
+
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="EnableGeneration" />
+                        <span>允许生成器为 .strm 抽帧（预留，当前无实现）</span>
+                    </label>
+                    <div class="fieldDescription">当前版本只读取现成文件，此开关暂时无效。</div>
+                </div>
+
+                <div>
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                        <span>保存</span>
+                    </button>
+                </div>
+            </form>
+
+            <div class="sectionTitleContainer flex align-items-center" style="margin-top:2em;">
+                <h2 class="sectionTitle">运行状态</h2>
+            </div>
+            <div id="StrmTrickplayStatus" class="fieldDescription">加载中…</div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        (function () {
+            var pluginId = '3f9a7c14-5b62-4d8e-9a10-7c6e2f5b8d31';
+            var form = document.querySelector('#StrmTrickplayConfigForm');
+
+            function el(id) {
+                return document.querySelector('#' + id);
+            }
+
+            function loadStatus() {
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('Plugins/StrmTrickplay/Status'),
+                    type: 'GET',
+                    dataType: 'json'
+                }).then(function (status) {
+                    el('StrmTrickplayStatus').innerHTML =
+                        '<div>插件版本：' + (status.version || '-') + '</div>' +
+                        '<div>已缓存条目：' + status.cachedItems + '</div>' +
+                        '<div>候选目录名：' + (status.sidecarFolderNames || []).join(' , ') + '</div>' +
+                        '<div>当前 ITrickplayManager：' + (status.trickplayManagerType || '-') + '</div>';
+                }).catch(function () {
+                    el('StrmTrickplayStatus').textContent = '无法读取状态（可能未以管理员身份登录）。';
+                });
+            }
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    config.Enabled = el('Enabled').checked;
+                    config.SidecarFolderNames = (el('SidecarFolderNames').value || '')
+                        .split(/[\r\n,]+/)
+                        .map(function (v) { return v.trim(); })
+                        .filter(function (v) { return v.length > 0; });
+                    config.AllowAnySiblingTrickplayFolder = el('AllowAnySiblingTrickplayFolder').checked;
+                    config.DefaultWidth = parseInt(el('DefaultWidth').value || '320', 10);
+                    config.DefaultTileWidth = parseInt(el('DefaultTileWidth').value || '10', 10);
+                    config.DefaultTileHeight = parseInt(el('DefaultTileHeight').value || '10', 10);
+                    config.IntervalOverrideMs = parseInt(el('IntervalOverrideMs').value || '0', 10);
+                    config.CacheSeconds = parseInt(el('CacheSeconds').value || '600', 10);
+                    config.EmptyCacheSeconds = parseInt(el('EmptyCacheSeconds').value || '60', 10);
+                    config.UnknownRuntimeCacheSeconds = parseInt(el('UnknownRuntimeCacheSeconds').value || '300', 10);
+                    config.VerboseLogging = el('VerboseLogging').checked;
+                    config.EnableGeneration = el('EnableGeneration').checked;
+
+                    ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                        loadStatus();
+                    });
+                });
+
+                return false;
+            });
+
+            ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                el('Enabled').checked = config.Enabled !== false;
+                el('SidecarFolderNames').value = (config.SidecarFolderNames || ['{name}.trickplay', 'trickplay']).join('\n');
+                el('AllowAnySiblingTrickplayFolder').checked = !!config.AllowAnySiblingTrickplayFolder;
+                el('DefaultWidth').value = config.DefaultWidth || 320;
+                el('DefaultTileWidth').value = config.DefaultTileWidth || 10;
+                el('DefaultTileHeight').value = config.DefaultTileHeight || 10;
+                el('IntervalOverrideMs').value = config.IntervalOverrideMs || 0;
+                el('CacheSeconds').value = config.CacheSeconds || 600;
+                el('EmptyCacheSeconds').value = config.EmptyCacheSeconds || 60;
+                el('UnknownRuntimeCacheSeconds').value = config.UnknownRuntimeCacheSeconds || 300;
+                el('VerboseLogging').checked = !!config.VerboseLogging;
+                el('EnableGeneration').checked = !!config.EnableGeneration;
+                loadStatus();
+            });
+        })();
+    </script>
+</div>
+</body>
+</html>

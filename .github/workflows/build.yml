@@ -1,0 +1,183 @@
+name: Build plugin
+
+# 每次 push 都会构建出可直接给 Jellyfin 使用的插件包（workflow artifact）。
+# 打 tag（如 v0.2.0.0）或手动 dispatch 勾选 publish 时，额外发布 GitHub Release
+# 并更新 gh-pages 上的 manifest.json，用户在 Jellyfin 里添加一次仓库地址即可自动更新。
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "指定版本号（如 0.2.0.0；留空则自动生成 dev 版本 x.y.z.<run_number>）"
+        required: false
+        default: ""
+      publish:
+        description: "发布 GitHub Release 并更新插件仓库 manifest"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  # 统一 UTF-8，避免非英文描述在解析/打包时受系统区域设置影响
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  build:
+    name: 构建与打包
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_release: ${{ steps.version.outputs.is_release }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 解析版本号
+        id: version
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          INPUT_PUBLISH: ${{ github.event.inputs.publish }}
+        run: |
+          set -euo pipefail
+          manual="${INPUT_VERSION:-}"
+          publish="${INPUT_PUBLISH:-false}"
+          if [[ -n "$manual" ]]; then
+            raw="$manual"
+            release="$publish"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            raw="${GITHUB_REF#refs/tags/v}"
+            release="true"
+          else
+            base="$(python3 -c "import json,pathlib;print(json.loads(pathlib.Path('plugin.json').read_text(encoding='utf-8'))['version'])")"
+            raw="$(echo "$base" | cut -d. -f1-3).${GITHUB_RUN_NUMBER}"
+            release="false"
+          fi
+          IFS='.' read -r a b c d <<< "$raw"
+          version="${a:-0}.${b:-0}.${c:-0}.${d:-0}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "is_release=$release" >> "$GITHUB_OUTPUT"
+          echo "版本: $version (release=$release)"
+
+      - name: 还原依赖
+        run: dotnet restore Jellyfin.Plugin.StrmTrickplay/Jellyfin.Plugin.StrmTrickplay.csproj
+
+      - name: 解析器冒烟测试
+        run: dotnet run --project tests/ParserSmokeTest/ParserSmokeTest.csproj -c Release
+
+      - name: 构建并打包插件
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/package.py --version "${{ steps.version.outputs.version }}" --changelog "$(git log -1 --pretty=%s)"
+
+      - name: 展示产物
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -l dist/*.zip
+          cat dist/build-info.json
+
+      - name: 上传插件包
+        uses: actions/upload-artifact@v4
+        with:
+          name: strm-trickplay-${{ steps.version.outputs.version }}
+          path: |
+            dist/*.zip
+            dist/meta.json
+            dist/build-info.json
+          if-no-files-found: error
+
+  release:
+    name: 发布 Release 与插件仓库 manifest
+    needs: build
+    if: needs.build.outputs.is_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 下载插件包
+        uses: actions/download-artifact@v4
+        with:
+          name: strm-trickplay-${{ needs.build.outputs.version }}
+          path: dist
+
+      - name: 发布 GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="v${VERSION}"
+          zip="$(python3 -c "import json,pathlib;print(json.loads(pathlib.Path('dist/build-info.json').read_text(encoding='utf-8'))['zip'])")"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "dist/$zip" --clobber
+          else
+            gh release create "$tag" "dist/$zip" --title "$tag" --notes "$(git log -1 --pretty=%B)"
+          fi
+          echo "Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
+
+      - name: 生成插件仓库 manifest
+        shell: bash
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch --depth=1 origin gh-pages
+            git show FETCH_HEAD:manifest.json > staging/manifest-in.json 2>/dev/null || rm -f staging/manifest-in.json
+          fi
+          zip="$(python3 -c "import json,pathlib;print(json.loads(pathlib.Path('dist/build-info.json').read_text(encoding='utf-8'))['zip'])")"
+          args=(ci/repo.py --zip "dist/$zip" --version "$VERSION" --out staging/manifest.json \
+                --source-url "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${zip}" \
+                --changelog "$(git log -1 --pretty=%s)")
+          if [[ -f staging/manifest-in.json ]]; then
+            args+=(--manifest-in staging/manifest-in.json)
+          fi
+          python3 "${args[@]}"
+          cat staging/manifest.json
+
+      - name: 发布 manifest 到 gh-pages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p publish
+          cp staging/manifest.json publish/manifest.json
+          cd publish
+          git init -q -b gh-pages
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "chore: publish plugin manifest v${VERSION}"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+          echo "插件仓库地址: https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/manifest.json"

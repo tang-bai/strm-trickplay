@@ -1,0 +1,16 @@
+bin/
+obj/
+dist/
+staging/
+publish/
+repo/
+tools/
+.tools/
+.venv/
+__pycache__/
+*.zip
+.dotnet/
+.testserver/
+.testmedia/
+.vs/
+*.user
