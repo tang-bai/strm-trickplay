@@ -8,7 +8,7 @@
 <div id="StrmTrickplayConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-textarea,emby-button,emby-checkbox">
     <style>
         /* 颜色全部用中性灰半透明 + 主题色兜底，明暗主题都能用，不写死具体配色 */
-        #StrmTrickplayConfigPage { --cfg-line: rgba(128,128,128,.35); --cfg-line-soft: rgba(128,128,128,.22); --cfg-fill: rgba(128,128,128,.06); --cfg-fill-strong: rgba(128,128,128,.12); --cfg-accent: var(--theme-primary-color, var(--accent, #00a4dc)); }
+        #StrmTrickplayConfigPage { overflow-x: clip; --cfg-line: rgba(128,128,128,.35); --cfg-line-soft: rgba(128,128,128,.22); --cfg-fill: rgba(128,128,128,.06); --cfg-fill-strong: rgba(128,128,128,.12); --cfg-accent: var(--theme-primary-color, var(--accent, #00a4dc)); }
 
         /* —— 模块方框 —— */
         /* 关键：不依赖父容器的对齐方式显式铺满（仪表盘内容区可能是 flex 容器，会把 <form> 收缩成内容宽） */
@@ -28,6 +28,7 @@
             overflow: hidden;
         }
         #StrmTrickplayConfigPage .cfgBoxHeader {
+            min-width: 0;
             display: flex;
             align-items: center;
             gap: .7em;
@@ -60,8 +61,9 @@
             border: 1px solid var(--cfg-line);
             background: var(--cfg-fill-strong);
         }
-        #StrmTrickplayConfigPage .cfgBoxTitle { margin: 0; font-size: 1.02em; font-weight: 600; }
-        #StrmTrickplayConfigPage .cfgBoxHint { margin-left: auto; font-size: .82em; opacity: .7; text-align: right; }
+        #StrmTrickplayConfigPage .cfgBoxTitle { margin: 0; font-size: 1.02em; font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #StrmTrickplayConfigPage .cfgBoxHint { margin-left: auto; padding-left: .8em; font-size: .82em; opacity: .7; text-align: right; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        @media (max-width: 1100px) { #StrmTrickplayConfigPage .cfgBoxHint { display: none; } }
         #StrmTrickplayConfigPage .cfgChevron { flex: 0 0 auto; opacity: .65; transition: transform .15s ease; font-size: .9em; }
         #StrmTrickplayConfigPage .cfgBoxBody { padding: .9em 1.05em .25em; }
         #StrmTrickplayConfigPage .cfgBoxBody > .fieldDescription:first-child { margin-top: 0; }
@@ -72,9 +74,10 @@
         #StrmTrickplayConfigPage .cfgBoxBody .checkboxContainer:last-child { margin-bottom: .55em; }
 
         /* —— 页头 —— */
-        #StrmTrickplayConfigPage .cfgTopBar { display: flex; align-items: flex-start; flex-wrap: wrap; gap: .8em; margin: 0 0 1.1em; }
+        #StrmTrickplayConfigPage .cfgTopBar { display: block; margin: 0 0 1.1em; }
         #StrmTrickplayConfigPage .cfgTopHint { opacity: .7; font-size: .88em; margin-top: .15em; }
-        #StrmTrickplayConfigPage .cfgTopActions { margin-left: auto; display: flex; flex-wrap: wrap; gap: .5em; }
+        /* 按钮独立一行、左对齐：右对齐在窄/略宽容器里会被 overflow:hidden 裁掉 */
+        #StrmTrickplayConfigPage .cfgTopActions { display: flex; flex-wrap: wrap; gap: .5em; margin-top: .7em; }
 
         /* —— 栅格与列表 —— */
         #StrmTrickplayConfigPage .cfgGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 240px)); justify-content: start; gap: 0 1.2em; }
