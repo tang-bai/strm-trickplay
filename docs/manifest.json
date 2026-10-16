@@ -9,6 +9,16 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.5.1.0",
+        "changelog": "修复设置页在真实控制台里的字段错位，并新增侧边栏「插件 → STRM Trickplay」入口",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/strm-trickplay_0.5.1.0.zip",
+        "checksum": "7F3CF22223C7F7B1B2522489EF891148",
+        "timestamp": "2026-10-16T23:10:07.0639520Z",
+        "repositoryName": "STRM Trickplay",
+        "repositoryUrl": "https://github.com/tang-bai/strm-trickplay"
+      },
+      {
         "version": "0.5.0.0",
         "changelog": "设置页改版：每个模块独立方框、可折叠，运行状态与运行操作各自成区",
         "targetAbi": "12.2.0.0",
