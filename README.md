@@ -25,7 +25,16 @@ Jellyfin 12.2 核心对 strm 有三重阻断（均已对 v12.2 源码核实）�
 
 ## 2. 安装
 
-**方式 A（推荐）**：解压 `dist/strm-trickplay_<版本>.zip`（CI 产物同名），把里面两个文件放进 Jellyfin 数据目录的 `plugins/StrmTrickplay/`：
+**方式 A（推荐，可自动更新）**：在 Jellyfin 里 **控制台 → 插件 → 存储库 → 添加**，填入：
+
+```
+https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/manifest.json
+```
+
+保存后到 **目录** 里安装 *STRM Trickplay*；以后发新版 Jellyfin 会直接提示升级。
+（开启了 GitHub Pages 时也可用更短的 `https://tang-bai.github.io/strm-trickplay/manifest.json`。）
+
+**方式 B（离线安装）**：解压 `dist/strm-trickplay_<版本>.zip`（CI 产物同名），把里面两个文件放进 Jellyfin 数据目录的 `plugins/StrmTrickplay/`：
 
 ```
 <jellyfin-data>/plugins/StrmTrickplay/
@@ -33,7 +42,7 @@ Jellyfin 12.2 核心对 strm 有三重阻断（均已对 v12.2 源码核实）�
 └── meta.json
 ```
 
-**方式 B**：直接拷 `dist/Jellyfin.Plugin.StrmTrickplay.dll`（缺 `meta.json` 时仍会加载，但版本信息不准）。
+**方式 C**：直接拷 `dist/Jellyfin.Plugin.StrmTrickplay.dll`（缺 `meta.json` 时仍会加载，但版本信息不准）。
 
 放好后 **重启 Jellyfin**。Windows 典型路径 `%LOCALAPPDATA%\jellyfin\plugins\`，Docker 为 `/config/plugins/StrmTrickplay/`。
 
@@ -182,8 +191,11 @@ curl    "http://<server>:8096/Videos/<itemId>/Trickplay/320/tiles.m3u8?MediaSour
 | 推 tag `v0.2.0.0` | `0.2.0.0` | 同上 + GitHub Release + 更新 `gh-pages` 上的 `manifest.json` → Jellyfin 可自动更新 |
 | 手动 dispatch | 自定（勾选 publish 才发布） | 同上 |
 
-首次启用三步：① 仓库 `Settings → Actions → General` 权限设为 **Read and write**；② 推一个 tag；③ `Settings → Pages` 选 `gh-pages` 分支。
-之后在 Jellyfin 里 **控制台 → 插件 → 存储库** 添加：`https://tang-bai.github.io/strm-trickplay/manifest.json`。
+**分发通道就是仓库里的 `docs/`**（插件包 + `manifest.json` 放一起），所以：
+
+- **push 之后立即可用**（零配置）：`https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/manifest.json`
+- 想用短域名：`Settings → Pages` 选 **分支 main / 目录 /docs** → `https://tang-bai.github.io/strm-trickplay/manifest.json`
+- 要发新版：`Settings → Actions → General` 权限设为 **Read and write**，然后推 tag（CI 会把新包与清单提交回 `docs/` 并创建 Release）
 
 本地等价命令（版本号唯一来源是 [plugin.json](plugin.json)，CI 与本地共用同一套脚本）：
 
@@ -210,6 +222,10 @@ python ci/repo.py --zip dist/strm-trickplay_0.2.0.0.zip --version 0.2.0.0 --out 
 # 跳过编译，只重新打包
 .\build.ps1 -SkipBuild
 
+# 把包与清单发布到 docs/（CI 发版时做的就是这一步）
+python ci/publish.py --version 0.2.0.0
+python ci/publish.py --skip-build
+
 # 解析器冒烟测试（21 项断言，不需要 Jellyfin 服务端）
 .\.dotnet\dotnet.exe run --project .\tests\ParserSmokeTest\ParserSmokeTest.csproj -c Release
 ```
@@ -220,6 +236,8 @@ python ci/repo.py --zip dist/strm-trickplay_0.2.0.0.zip --version 0.2.0.0 --out 
 .github/workflows/build.yml          ★ push 即出包；tag 即发版 + 更新插件仓库清单
 ci/package.py                        ★ 生成 meta.json 并打包出 zip（跨平台）
 ci/repo.py                           ★ 生成 Jellyfin 插件仓库 manifest.json（含 MD5 校验和）
+ci/publish.py                        ★ 把插件包 + manifest 发布到 docs/（Jellyfin 存储库的来源）
+docs/                                ★ 分发目录：manifest.json + strm-trickplay_<版本>.zip
 plugin.json                          ★ 唯一版本/元数据来源（version / targetAbi / guid / 描述）
 Jellyfin.Plugin.StrmTrickplay/
 ├── Plugin.cs                        主插件类

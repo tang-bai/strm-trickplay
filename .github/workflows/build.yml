@@ -1,8 +1,9 @@
 name: Build plugin
 
 # 每次 push 都会构建出可直接给 Jellyfin 使用的插件包（workflow artifact）。
-# 打 tag（如 v0.2.0.0）或手动 dispatch 勾选 publish 时，额外发布 GitHub Release
-# 并更新 gh-pages 上的 manifest.json，用户在 Jellyfin 里添加一次仓库地址即可自动更新。
+# 打 tag（如 v0.2.0.0）或手动 dispatch 勾选 publish 时，会把插件包与 manifest.json
+# 一起发布到 docs/ 并创建 GitHub Release；用户在 Jellyfin 里添加一次存储库地址即可自动更新：
+#   https://raw.githubusercontent.com/<owner>/<repo>/<默认分支>/docs/manifest.json
 on:
   push:
     branches: ["**"]
@@ -108,13 +109,16 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: 发布 Release 与插件仓库 manifest
+    name: 发布插件包与仓库清单
     needs: build
     if: needs.build.outputs.is_release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: 检出代码
+      - name: 检出默认分支（用于把 docs/ 提交回去）
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
 
       - name: 安装 Python
         uses: actions/setup-python@v5
@@ -127,7 +131,34 @@ jobs:
           name: strm-trickplay-${{ needs.build.outputs.version }}
           path: dist
 
-      - name: 发布 GitHub Release
+      - name: 更新 docs/（插件包 + 仓库清单）
+        shell: bash
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          python3 ci/publish.py --skip-build --version "$VERSION" --branch "$BRANCH" \
+            --changelog "$(git log -1 --pretty=%s)"
+
+      - name: 提交并推送 docs/
+        shell: bash
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git add docs
+          if git diff --cached --quiet; then
+            echo "docs/ 无变化，跳过提交"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "chore: 发布 v${VERSION} 插件包与仓库清单 [skip ci]"
+          git push origin "HEAD:${BRANCH}"
+
+      - name: 创建 GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -141,43 +172,12 @@ jobs:
           else
             gh release create "$tag" "dist/$zip" --title "$tag" --notes "$(git log -1 --pretty=%B)"
           fi
-          echo "Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
 
-      - name: 生成插件仓库 manifest
+      - name: 输出存储库地址
         shell: bash
-        env:
-          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          set -euo pipefail
-          mkdir -p staging
-          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
-            git fetch --depth=1 origin gh-pages
-            git show FETCH_HEAD:manifest.json > staging/manifest-in.json 2>/dev/null || rm -f staging/manifest-in.json
-          fi
-          zip="$(python3 -c "import json,pathlib;print(json.loads(pathlib.Path('dist/build-info.json').read_text(encoding='utf-8'))['zip'])")"
-          args=(ci/repo.py --zip "dist/$zip" --version "$VERSION" --out staging/manifest.json \
-                --source-url "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${zip}" \
-                --changelog "$(git log -1 --pretty=%s)")
-          if [[ -f staging/manifest-in.json ]]; then
-            args+=(--manifest-in staging/manifest-in.json)
-          fi
-          python3 "${args[@]}"
-          cat staging/manifest.json
+          echo "在 Jellyfin 中添加插件存储库（控制台 → 插件 → 存储库 → 添加）："
+          echo "  https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${{ github.event.repository.default_branch }}/docs/manifest.json"
+          echo "开启 Pages（分支 ${{ github.event.repository.default_branch }} + 目录 /docs）后也可用："
+          echo "  https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/manifest.json"
 
-      - name: 发布 manifest 到 gh-pages
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.build.outputs.version }}
-        run: |
-          set -euo pipefail
-          mkdir -p publish
-          cp staging/manifest.json publish/manifest.json
-          cd publish
-          git init -q -b gh-pages
-          git add -A
-          git -c user.name="github-actions[bot]" \
-              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -q -m "chore: publish plugin manifest v${VERSION}"
-          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
-          echo "插件仓库地址: https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/manifest.json"

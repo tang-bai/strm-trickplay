@@ -1,0 +1,23 @@
+[
+  {
+    "guid": "3f9a7c14-5b62-4d8e-9a10-7c6e2f5b8d31",
+    "name": "STRM Trickplay",
+    "description": "让 Jellyfin 中的 .strm 条目复用媒体目录下已经生成好的 .trickplay 瓦片目录，在播放时显示进度条缩略图预览。目录规范与 Jellyfin 原生 SaveTrickplayWithMedia 一致：<文件名>.trickplay/<宽> - <瓦片宽>x<瓦片高>/<序号>.jpg",
+    "overview": "为 .strm（远端直链）条目提供 trickplay 进度条预览（复用同级目录下已生成的瓦片）",
+    "owner": "",
+    "category": "General",
+    "imageUrl": "",
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "changelog": "首个可安装版本：.strm 复用同级 .trickplay 瓦片，播放时显示进度条预览",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/strm-trickplay_0.1.0.0.zip",
+        "checksum": "9E8E2102B2ED04077EB5B1F5B72A41B6",
+        "timestamp": "2026-10-16T20:51:17.3090330Z",
+        "repositoryName": "STRM Trickplay",
+        "repositoryUrl": "https://github.com/tang-bai/strm-trickplay"
+      }
+    ]
+  }
+]
