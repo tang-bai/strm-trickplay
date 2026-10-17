@@ -6,8 +6,18 @@
     "overview": "为 .strm 条目提供 trickplay 进度条预览（复用同级目录下已生成的瓦片）、探测补齐时长/编码/分辨率等媒体信息，并加速起播（跳过点播时重复的远端探测）",
     "owner": "",
     "category": "General",
-    "imageUrl": "",
+    "imageUrl": "https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/thumb.png",
     "versions": [
+      {
+        "version": "0.5.5.0",
+        "changelog": "新增插件封面图：Jellyfin 插件目录里会显示缩略图，README 顶部也放上",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/strm-trickplay_0.5.5.0.zip",
+        "checksum": "2D6551BC5B7AACE3829B73E8181ED387",
+        "timestamp": "2026-10-17T00:04:34.7228480Z",
+        "repositoryName": "STRM Trickplay",
+        "repositoryUrl": "https://github.com/tang-bai/strm-trickplay"
+      },
       {
         "version": "0.5.4.0",
         "changelog": "顶部「全部展开 / 全部折叠 / 刷新状态」改为独立一行靠左，不再被页面右缘裁掉",
