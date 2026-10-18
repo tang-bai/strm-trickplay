@@ -3,6 +3,7 @@ using System.Linq;
 using Jellyfin.Plugin.StrmTrickplay.EventHandlers;
 using Jellyfin.Plugin.StrmTrickplay.Playback;
 using Jellyfin.Plugin.StrmTrickplay.Probe;
+using Jellyfin.Plugin.StrmTrickplay.Subtitles;
 using Jellyfin.Plugin.StrmTrickplay.Trickplay;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
@@ -26,6 +27,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<ISidecarTrickplayIndex, SidecarTrickplayIndex>();
         serviceCollection.AddSingleton<ITrickplayGenerator, NoopTrickplayGenerator>();
         serviceCollection.AddSingleton<IStrmProbeService, StrmProbeService>();
+        serviceCollection.AddSingleton<IStrmSubtitleService, StrmSubtitleService>();
         serviceCollection.AddHostedService<LibraryChangeListener>();
 
         // 保留"我们之前最后一次注册"的实现作为回退，支持与其它插件的装饰链共存

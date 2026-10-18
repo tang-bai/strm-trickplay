@@ -113,4 +113,26 @@ public class PluginConfiguration : BasePluginConfiguration
     /// playback-time remote probe that Jellyfin forces for every strm item.
     /// </summary>
     public bool EnableFastStartup { get; set; } = true;
+
+    // —————— 外挂字幕（含 ASS）——————
+
+    /// <summary>
+    /// Gets or sets a value indicating whether sidecar subtitles next to the .strm are mounted.
+    /// </summary>
+    public bool EnableSidecarSubtitles { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets extra subfolder names (relative to the media folder) that are scanned for subtitles.
+    /// </summary>
+    public string[] SubtitleAdditionalFolders { get; set; } = ["Subs", "Subtitles", "字幕"];
+
+    /// <summary>
+    /// Gets or sets the language filters (ISO 639-2, e.g. chi/eng). Empty means all languages.
+    /// </summary>
+    public string[] SubtitleLanguageFilter { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the language whose first external subtitle is marked as default (empty = never).
+    /// </summary>
+    public string SubtitleDefaultLanguage { get; set; } = "";
 }

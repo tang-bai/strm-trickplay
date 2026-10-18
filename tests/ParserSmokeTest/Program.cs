@@ -1,5 +1,6 @@
 using Jellyfin.Plugin.StrmTrickplay.Configuration;
 using Jellyfin.Plugin.StrmTrickplay.Playback;
+using Jellyfin.Plugin.StrmTrickplay.Subtitles;
 using Jellyfin.Plugin.StrmTrickplay.Probe;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
@@ -154,6 +155,7 @@ var probeService = new StrmProbeService(
     mediaSourceManager.Object,
     new Mock<IDirectoryService>().Object,
     new Mock<ISidecarTrickplayIndex>().Object,
+    new Mock<IStrmSubtitleService>().Object,
     NullLogger<StrmProbeService>.Instance);
 
 var strmNoData = new Movie { Id = Guid.NewGuid(), Path = Path.Combine(root, "probe-a.strm"), IsShortcut = true };
@@ -201,6 +203,30 @@ var localFile = new Movie
     RunTimeTicks = TimeSpan.FromMinutes(90).Ticks
 };
 Check("非 strm 本地文件 => 不介入", !PlaybackProbePolicy.ShouldSkipProbe(localFile, videoStreams, true), "false");
+
+Console.WriteLine("\n=== 用例 12：外挂字幕文件名解析（ASS 等） ===");
+var sub1 = SidecarSubtitleParser.Parse(Path.Combine(root, "影片.chs.ass"), "影片");
+Check("chs => 语言 chi", sub1?.Language == "chi", sub1?.Language ?? "null");
+Check("ass => codec ass", sub1?.Codec == "ass", sub1?.Codec ?? "null");
+Check("ass => 标记为外挂字幕", sub1?.IsExternal == true, sub1?.IsExternal.ToString() ?? "null");
+
+var sub2 = SidecarSubtitleParser.Parse(Path.Combine(root, "影片.en.forced.srt"), "影片");
+Check("en => 语言 eng", sub2?.Language == "eng", sub2?.Language ?? "null");
+Check("forced 标志", sub2?.IsForced == true, sub2?.IsForced.ToString() ?? "null");
+Check("srt => codec subrip", sub2?.Codec == "subrip", sub2?.Codec ?? "null");
+Check("标题含 Forced", SidecarSubtitleParser.BuildTitle(sub2!).Contains("Forced", StringComparison.Ordinal), SidecarSubtitleParser.BuildTitle(sub2!));
+
+var sub3 = SidecarSubtitleParser.Parse(Path.Combine(root, "影片.简体中文.ass"), "影片");
+Check("简体中文 => 语言 chi", sub3?.Language == "chi", sub3?.Language ?? "null");
+
+var sub4 = SidecarSubtitleParser.Parse(Path.Combine(root, "影片.zh-Hans.vtt"), "影片");
+Check("zh-Hans => 语言 chi", sub4?.Language == "chi", sub4?.Language ?? "null");
+Check("vtt => codec webvtt", sub4?.Codec == "webvtt", sub4?.Codec ?? "null");
+
+Check("影片2.ass 不属于 影片", !SidecarSubtitleParser.MatchesMedia("影片2", "影片"), "false");
+Check("影片.chs 属于 影片", SidecarSubtitleParser.MatchesMedia("影片.chs", "影片"), "true");
+Check("sdh => 听力障碍标志", SidecarSubtitleParser.Parse(Path.Combine(root, "影片.sdh.ass"), "影片")?.IsHearingImpaired == true, "true");
+Check("不支持扩展名 => null", SidecarSubtitleParser.Parse(Path.Combine(root, "影片.txt"), "影片") is null, "null");
 
 Console.WriteLine();
 if (failures.Count == 0)

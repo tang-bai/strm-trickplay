@@ -288,9 +288,48 @@
                     </div>
                 </section>
 
-                <section class="cfgBox" data-module="advanced" data-collapsible="1">
+                <section class="cfgBox" data-module="subtitle" data-collapsible="1">
                     <div class="cfgBoxHeader" role="button" tabindex="0" aria-expanded="true" title="点击折叠 / 展开这个模块">
                         <span class="cfgBadge">5</span>
+                        <h3 class="cfgBoxTitle">外挂字幕（含 ASS）</h3>
+                        <span class="cfgBoxHint">扫描同级目录并挂载</span>
+                        <span class="cfgChevron">▾</span>
+                    </div>
+                    <div class="cfgBoxBody">
+                        <div class="fieldDescription">
+                            Jellyfin 只对 <code>file</code> 协议的条目扫描外挂字幕，而 <code>.strm</code> 的媒体源是 http，
+                            所以核心<b>永远找不到</b> strm 旁边的字幕文件。打开后由插件扫描并挂到条目上，客户端字幕菜单即可选择
+                            （ASS 由 Jellyfin 按客户端能力直传或转成 VTT）。
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="EnableSidecarSubtitles" />
+                                <span>启用外挂字幕扫描与挂载</span>
+                            </label>
+                            <div class="fieldDescription">探测成功时、条目新增 / 更新时、以及每天的计划任务都会执行（幂等，不会重复挂载）。</div>
+                        </div>
+                        <div class="cfgGrid-wide">
+                            <div class="inputContainer">
+                                <div class="cfgFieldLabel">额外扫描的子目录（每行一个，相对媒体目录）</div>
+                                <textarea is="emby-textarea" id="SubtitleAdditionalFolders" class="cfgTextarea" rows="3"></textarea>
+                                <div class="fieldDescription">默认 <code>Subs</code> / <code>Subtitles</code> / <code>字幕</code>；留空则只扫媒体所在目录。</div>
+                            </div>
+                            <div class="inputContainer">
+                                <div class="cfgFieldLabel">语言过滤（每行一个，留空 = 全部）</div>
+                                <textarea is="emby-textarea" id="SubtitleLanguageFilter" class="cfgTextarea" rows="3"></textarea>
+                                <div class="fieldDescription">用 ISO 639-2 三字母代码，如 <code>chi</code> / <code>eng</code>。</div>
+                            </div>
+                        </div>
+                        <div class="inputContainer">
+                            <input is="emby-input" type="text" id="SubtitleDefaultLanguage" label="默认选中语言（留空 = 不指定，例如 chi）" />
+                            <div class="fieldDescription">填了之后该语言的第一条外挂字幕会被标记为默认，客户端通常会自动选中。</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="cfgBox" data-module="advanced" data-collapsible="1">
+                    <div class="cfgBoxHeader" role="button" tabindex="0" aria-expanded="true" title="点击折叠 / 展开这个模块">
+                        <span class="cfgBadge">6</span>
                         <h3 class="cfgBoxTitle">高级</h3>
                         <span class="cfgBoxHint">日志与预留项</span>
                         <span class="cfgChevron">▾</span>
@@ -339,6 +378,7 @@
                         <button is="emby-button" type="button" id="btnSelfTest" class="raised emby-button"><span>运行自检</span></button>
                         <button is="emby-button" type="button" id="btnCount" class="raised emby-button"><span>统计待探测条目</span></button>
                         <button is="emby-button" type="button" id="btnProbe" class="raised emby-button"><span>立即探测（后台）</span></button>
+                        <button is="emby-button" type="button" id="btnSubtitleScan" class="raised emby-button"><span>扫描外挂字幕（后台）</span></button>
                         <button is="emby-button" type="button" id="btnIndex" class="raised emby-button"><span>重建 trickplay 索引</span></button>
                     </div>
                     <pre id="actionResult" class="result">（点上面的按钮查看结果）</pre>
@@ -373,7 +413,11 @@
                 ProbeLibraryNames: [],
                 VerboseLogging: false,
                 EnableGeneration: false,
-                EnableFastStartup: true
+                EnableFastStartup: true,
+                EnableSidecarSubtitles: true,
+                SubtitleAdditionalFolders: ['Subs', 'Subtitles', '字幕'],
+                SubtitleLanguageFilter: [],
+                SubtitleDefaultLanguage: ''
             };
 
             function el(id) { return document.querySelector('#' + id); }
@@ -440,6 +484,12 @@
                         ['待处理队列', probe.queuedItems + ' 个'],
                         ['最近一次探测', last ? (last.trigger + '：共 ' + last.total + '，成功 ' + last.probed + '，失败 ' + last.failed) : '尚未运行'],
                         ['起播加速', ((s.fastStartup && s.fastStartup.enabled) ? '已启用' : '已关闭')],
+                        ['外挂字幕', (function () {
+                            var sub = s.sidecarSubtitles || {};
+                            if (!sub.enabled) { return '已关闭'; }
+                            var folders = (sub.folders || []).join(' / ') || '（仅媒体目录）';
+                            return '已启用（扫描：' + folders + '）';
+                        })()],
                         ['ITrickplayManager', s.trickplayManagerType || '-']
                     ];
                     var wideRows = { 'ITrickplayManager': 1, '最近一次探测': 1 };
@@ -502,6 +552,10 @@
                 el('VerboseLogging').checked = !!config.VerboseLogging;
                 el('EnableGeneration').checked = !!config.EnableGeneration;
                 el('EnableFastStartup').checked = config.EnableFastStartup !== false;
+                el('EnableSidecarSubtitles').checked = config.EnableSidecarSubtitles !== false;
+                el('SubtitleAdditionalFolders').value = (config.SubtitleAdditionalFolders || defaults.SubtitleAdditionalFolders).join('\n');
+                el('SubtitleLanguageFilter').value = (config.SubtitleLanguageFilter || []).join('\n');
+                el('SubtitleDefaultLanguage').value = config.SubtitleDefaultLanguage || '';
             }
 
             function loadConfig() {
@@ -542,6 +596,12 @@
                     config.VerboseLogging = el('VerboseLogging').checked;
                     config.EnableGeneration = el('EnableGeneration').checked;
                     config.EnableFastStartup = el('EnableFastStartup').checked;
+                    config.EnableSidecarSubtitles = el('EnableSidecarSubtitles').checked;
+                    config.SubtitleAdditionalFolders = (el('SubtitleAdditionalFolders').value || '')
+                        .split(/[\r\n,]+/).map(function (v) { return v.trim(); }).filter(function (v) { return v.length > 0; });
+                    config.SubtitleLanguageFilter = (el('SubtitleLanguageFilter').value || '')
+                        .split(/[\r\n,]+/).map(function (v) { return v.trim(); }).filter(function (v) { return v.length > 0; });
+                    config.SubtitleDefaultLanguage = (el('SubtitleDefaultLanguage').value || '').trim();
 
                     ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);
@@ -583,6 +643,12 @@
                 api('POST', apiBase + '/Index/Rebuild').then(function (r) {
                     loadStatus();
                     show(JSON.stringify(r, null, 2));
+                }, function (e) { show('触发失败：' + e.status); });
+            });
+
+            el('btnSubtitleScan').addEventListener('click', function () {
+                api('POST', apiBase + '/Subtitles/Run').then(function (r) {
+                    show(JSON.stringify(r, null, 2) + '\n\n任务已在后台运行，可在 控制台 → 计划任务 里查看进度。');
                 }, function (e) { show('触发失败：' + e.status); });
             });
 

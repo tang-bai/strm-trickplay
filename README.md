@@ -7,8 +7,8 @@
 | 项目 | 值 |
 |---|---|
 | 适配 | **Jellyfin 12.2**（`targetAbi 12.2.0.0`，.NET 10） |
-| 当前版本 | **0.5.5.0** —— 每个版本改了什么见 [CHANGELOG.md](CHANGELOG.md) |
-| 三项能力 | ① 进度条预览（trickplay） ② 媒体信息探测（时长/编码/分辨率） ③ 起播加速 |
+| 当前版本 | **0.6.0.0** —— 每个版本改了什么见 [CHANGELOG.md](CHANGELOG.md) |
+| 四项能力 | ① 进度条预览（trickplay） ② 媒体信息探测（时长/编码/分辨率） ③ 起播加速 ④ 外挂字幕（含 ASS） |
 | 插件存储库 | `https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/manifest.json` |
 | 实测状态 | 已在真实 **Jellyfin 12.2.0** 服务端逐项验证，命令与原始输出见 [TEST-REPORT.md](TEST-REPORT.md) |
 | 许可 | MIT（[LICENSE](LICENSE)） |
@@ -24,12 +24,13 @@
 - [5. 能力① 进度条预览](#5-能力-进度条预览)
 - [6. 能力② STRM 媒体信息探测](#6-能力-strm-媒体信息探测)
 - [7. 能力③ 起播加速](#7-能力-起播加速)
-- [8. 配置项](#8-配置项)
-- [9. 诊断接口与日志](#9-诊断接口与日志)
-- [10. 故障排查](#10-故障排查)
-- [11. 已知限制与兼容性](#11-已知限制与兼容性)
-- [12. 开发、发版与文档](#12-开发发版与文档)
-- [13. 许可证与致谢](#13-许可证与致谢)
+- [8. 能力④ 外挂字幕（含 ASS）](#8-能力-外挂字幕含-ass)
+- [9. 配置项](#9-配置项)
+- [10. 诊断接口与日志](#10-诊断接口与日志)
+- [11. 故障排查](#11-故障排查)
+- [12. 已知限制与兼容性](#12-已知限制与兼容性)
+- [13. 开发、发版与文档](#13-开发发版与文档)
+- [14. 许可证与致谢](#14-许可证与致谢)
 
 ---
 
@@ -417,7 +418,70 @@ if (!item.IsShortcut || options.EnableRemoteContentProbe) { mediaInfoResult = aw
 
 ---
 
-## 8. 配置项
+## 8. 能力④ 外挂字幕（含 ASS）
+
+### 8.1 为什么 strm 字幕不显示
+
+Jellyfin 的外挂字幕扫描（`MediaInfoResolver.GetExternalSubtitleFiles`）第一句就是：
+
+```csharp
+if (!video.IsFileProtocol)
+{
+    return Array.Empty<ExternalPathParserResult>();
+}
+```
+
+`.strm` 的媒体源是 http（`IsFileProtocol = false`），所以**核心永远不会去找 strm 旁边的字幕文件**：
+就算把 `影片.chs.ass` 放在 `影片.strm` 同目录，客户端字幕菜单里也不会有它。
+
+而"读取与转换"这一步核心其实是支持的 —— `SubtitleEncoder` 里专门留了注释：
+
+```csharp
+// It's possible that the subtitleStream and mediaSource don't share the same protocol (e.g. .STRM file with local subs)
+```
+
+**缺的只是"发现"**，这正是插件补上的部分。
+
+### 8.2 插件怎么做
+
+扫描 `.strm` 所在目录（可再配置子目录，默认 `Subs` / `Subtitles` / `字幕`），把匹配到的字幕**挂到条目上**：
+
+| 环节 | 说明 |
+|---|---|
+| 文件名匹配 | 必须以媒体主文件名开头，后用分隔符接语言 / 标志：`影片.chs.ass`、`影片.en.forced.srt`、`影片.简体中文.ass` |
+| 语言识别 | ISO 639-1/2 代码（`zh` `chi` `en` `jpn`…）+ 中文习惯写法（`简体中文` `繁中` `中英` `双语`…） |
+| 标志识别 | `forced` / `default` / `sdh`（也认 `cc` `hi`） |
+| 支持格式 | `.ass` `.ssa` `.srt` `.vtt` `.smi` `.ttml` `.sub` `.idx` `.sup` |
+| 挂载方式 | 写入条目媒体流（`IMediaStreamRepository.SaveMediaStreams`），标为外挂字幕 → 客户端字幕菜单即可选择 |
+| ASS 播放 | 客户端支持就直传 ASS；网页端由 Jellyfin 转成 VTT（样式会简化，这是核心行为，不是插件丢的） |
+
+匹配规则与核心一致（核心那条 `IsFileProtocol` 前面就是同一套命名解析），所以不会"多认出"别的东西。
+
+### 8.3 三个触发点
+
+1. **媒体信息探测成功后**自动挂（推荐用法：一次探测同时补齐时长与字幕）；
+2. **条目新增 / 更新**时自动挂（复用媒体库事件）；
+3. 计划任务 **「扫描 STRM 外挂字幕」**（默认每天 05:00；设置页可点「扫描外挂字幕（后台）」立即跑）。
+
+整个流程**幂等**：重复执行不会重复挂载；字幕文件被删掉后，下次扫描会把它从条目上摘掉。
+
+### 8.4 怎么确认
+
+```bash
+# 诊断：扫描到哪些字幕文件 + 当前挂载了哪些
+curl -H "Authorization: MediaBrowser Token=<APIKEY>" \
+     "http://<服务器>:8096/Plugins/StrmTrickplay/Subtitles/<32位itemId>"
+
+# 立即扫描并挂载
+curl -X POST -H "Authorization: MediaBrowser Token=<APIKEY>" \
+     "http://<服务器>:8096/Plugins/StrmTrickplay/Subtitles/<32位itemId>/Scan"
+```
+
+期望 `discovered` 里出现你的 `.ass`、`mounted` 里出现 `codec: ass`；刷新播放页后字幕菜单即可选到。
+
+---
+
+## 9. 配置项
 
 两种打开方式：**控制台左侧菜单 → 插件 → STRM Trickplay**，或在 **控制台 → 插件 → 我的插件** 里点该插件卡片上的设置按钮。设置页把每个模块放在**独立方框**里，点击方框标题即可折叠 / 展开（状态记在浏览器里），顶部另有 **全部展开 / 全部折叠 / 刷新状态** 三个快捷按钮：
 
@@ -432,19 +496,20 @@ if (!item.IsShortcut || options.EnableRemoteContentProbe) { mediaInfoResult = aw
 | **② 目录与解析** | 去哪里找瓦片、怎么认（侧车目录名 / 兜底目录 / 兜底宽度与网格 / 强制间隔） |
 | **③ 缓存** | 三档索引缓存时长 |
 | **④ 媒体信息探测与起播加速** | ffprobe 补齐媒体信息 + 点播时跳过重复探测（开关 + 参数 + 媒体库范围） |
-| **⑤ 高级** | 详细日志、生成器预留项 |
+| **⑤ 外挂字幕（含 ASS）** | 扫描同级目录 / 子目录并挂载字幕（语言过滤、默认语言） |
+| **⑥ 高级** | 详细日志、生成器预留项 |
 | **保存** | 写入插件配置（无需重启） |
 | **操作** | 运行自检 / 统计待探测条目 / 立即探测（后台） / 重建 trickplay 索引，结果输出在框内 |
 
 下面是每个方框里的参数明细。
 
-### 8.1 基本
+### 9.1 基本
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
 | 启用插件 | 开 | 关闭后完全透传核心行为（strm 将没有预览，也不再探测与加速） |
 
-### 8.2 目录与解析
+### 9.2 目录与解析
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
@@ -454,7 +519,7 @@ if (!item.IsShortcut || options.EnableRemoteContentProbe) { mediaInfoResult = aw
 | 兜底瓦片网格 | 10 x 10 | 目录名里没有网格信息时使用 |
 | **强制缩略图间隔** | 0（自动） | 自动推断与官方 12.2 算法一致；**显式填值则以你为准**（预览位置偏移时校准，常见 2000 / 5000 / 10000） |
 
-### 8.3 缓存
+### 9.3 缓存
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
@@ -462,7 +527,7 @@ if (!item.IsShortcut || options.EnableRemoteContentProbe) { mediaInfoResult = aw
 | 未命中缓存 | 60 秒 | 没有瓦片时的负缓存 |
 | 未知时长缓存 | 300 秒 | 时长未知时用短缓存；时长一旦可知会自动重算间隔 |
 
-### 8.4 STRM 媒体信息探测
+### 9.4 STRM 媒体信息探测
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
@@ -475,14 +540,22 @@ if (!item.IsShortcut || options.EnableRemoteContentProbe) { mediaInfoResult = aw
 | 探测范围 | 全部媒体库 | 可只勾选部分媒体库 |
 | **起播加速** | 开 | 见 [第 7 节](#7-能力-起播加速) |
 
-### 8.5 高级
+### 9.5 外挂字幕（含 ASS）
+
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| 启用外挂字幕扫描与挂载 | 开 | 关闭后探测 / 事件 / 计划任务都不再挂载字幕（已挂载的不会被删除） |
+| 额外扫描的子目录 | `Subs`、`Subtitles`、`字幕` | 每行一个，相对媒体所在目录；留空则只扫媒体目录 |
+| 语言过滤 | 空（全部） | 每行一个 ISO 639-2 代码（`chi` / `eng`…），只挂载这些语言 |
+| 默认选中语言 | 空（不指定） | 填 `chi` 后，中文的第一条外挂字幕会被标为默认，客户端通常自动选中 |
+### 9.6 高级
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
 | 输出详细日志 | 关 | 排查问题时打开，关键字 `[StrmTrickplay]` |
 | 允许生成器为 `.strm` 抽帧 | 关 | 预留位，当前版本只读取现成瓦片，不会用 ffmpeg 抽帧 |
 
-### 8.6 计划任务
+### 9.7 计划任务
 
 两个任务都可**手动立即运行 / 随时取消**：
 
@@ -490,14 +563,15 @@ if (!item.IsShortcut || options.EnableRemoteContentProbe) { mediaInfoResult = aw
 |---|---|---|
 | 刷新 STRM Trickplay 索引 | 每天 03:00 | 媒体目录被外部工具批量改动后重建瓦片缓存 |
 | 探测 STRM 媒体信息 | 每天 04:00 | 为缺少媒体信息的 `.strm` 条目跑远端探测 |
+| 扫描 STRM 外挂字幕 | 每天 05:00 | 为缺少外挂字幕的 `.strm` 条目扫描同级目录 / 子目录并挂载（含 ASS） |
 
 日常改动靠媒体库事件自动失效，新增文件即时生效，通常不需要手动跑。
 
 ---
 
-## 9. 诊断接口与日志
+## 10. 诊断接口与日志
 
-### 9.1 接口一览
+### 10.1 接口一览
 
 所有接口都需要**管理员权限**（`RequiresElevation`）。`<APIKEY>` 在 控制台 → API 密钥 里创建。
 
@@ -510,9 +584,12 @@ if (!item.IsShortcut || options.EnableRemoteContentProbe) { mediaInfoResult = aw
 | `/Plugins/StrmTrickplay/Probe/Status` | GET | 探测状态；加 `?count=true` 顺便统计全库待探测条目数（大库较慢） |
 | `/Plugins/StrmTrickplay/Probe/Item/{itemId}` | POST | 立即探测单个条目，返回探测前后的时长与媒体流数量 |
 | `/Plugins/StrmTrickplay/Probe/Run` | POST | 把"探测 STRM 媒体信息"计划任务排入队列（后台执行） |
+| `/Plugins/StrmTrickplay/Subtitles/{itemId}` | GET | 外挂字幕诊断：扫描到哪些字幕文件 + 当前挂载情况 |
+| `/Plugins/StrmTrickplay/Subtitles/{itemId}/Scan` | POST | 立即为该条目扫描并挂载外挂字幕（返回新增/清理数量） |
+| `/Plugins/StrmTrickplay/Subtitles/Run` | POST | 把「扫描 STRM 外挂字幕」计划任务排入队列 |
 | `/Plugins/StrmTrickplay/Index/Rebuild` | POST | 清空索引并把"刷新索引"任务排入队列 |
 
-### 9.2 日志关键字
+### 10.2 日志关键字
 
 **全部日志都带 `[StrmTrickplay]` 前缀**，常用几条：
 
@@ -522,9 +599,10 @@ if (!item.IsShortcut || options.EnableRemoteContentProbe) { mediaInfoResult = aw
 | `已挂接媒体库变更事件` | 缓存失效 + 新增条目自动探测已就绪 |
 | `起播加速：<片名> 的媒体信息已完整，跳过本次远端探测` | 能力③ 生效 |
 | `探测完成：成功 N，失败 M，总 T，耗时 ...` | 一次探测批次的结果 |
+| `外挂字幕已挂载: <片名>（扫描 X，挂载 Y，清理 Z）` | 外挂字幕挂载结果 |
 | `扫描 N 个条目，其中 M 个 .strm 需要探测媒体信息` | 计划任务开始时的统计 |
 
-### 9.3 三步定位法
+### 10.3 三步定位法
 
 ```bash
 # ① 插件是否加载（应返回 JSON，而不是 404）
@@ -544,7 +622,7 @@ curl -X POST -H "Authorization: MediaBrowser Token=<APIKEY>" \
 
 ---
 
-## 10. 故障排查
+## 11. 故障排查
 
 | 症状 | 可能原因 | 处理 |
 |---|---|---|
@@ -562,7 +640,7 @@ curl -X POST -H "Authorization: MediaBrowser Token=<APIKEY>" \
 
 ---
 
-## 11. 已知限制与兼容性
+## 12. 已知限制与兼容性
 
 1. **不生成瓦片**：只读取现成文件。想要"插件自己用 ffmpeg 抽帧"需要另外实现（`ITrickplayGenerator` 接口已预留）。
 2. **间隔靠推断**：瓦片目录里没有"每张缩略图间隔"的元数据。时长未知时取服务器 `TrickplayOptions.Interval`；
@@ -578,9 +656,9 @@ curl -X POST -H "Authorization: MediaBrowser Token=<APIKEY>" \
 
 ---
 
-## 12. 开发、发版与文档
+## 13. 开发、发版与文档
 
-### 12.1 版本演进
+### 13.1 版本演进
 
 | 版本 | 主要内容 |
 |---|---|
@@ -591,7 +669,7 @@ curl -X POST -H "Authorization: MediaBrowser Token=<APIKEY>" \
 
 完整记录见 [CHANGELOG.md](CHANGELOG.md)（**发版说明的唯一来源**，Release 正文与 Jellyfin 目录里的 changelog 都取自它）。
 
-### 12.2 本地开发
+### 13.2 本地开发
 
 ```powershell
 # 编译 + 打包（版本取自 plugin.json，产物在 dist/）；会把该版本的更新说明一并打印/写入 meta.json
@@ -606,7 +684,7 @@ curl -X POST -H "Authorization: MediaBrowser Token=<APIKEY>" \
 for f in ci/tests/*.test.sh; do bash "$f"; done
 ```
 
-### 12.3 发版
+### 13.3 发版
 
 1. 在 [CHANGELOG.md](CHANGELOG.md) 里补一节（`## [新版本] - 日期` + `### 变更摘要`）；
 2. 改 `plugin.json` 的 `version`，提交推送；
@@ -615,7 +693,7 @@ for f in ci/tests/*.test.sh; do bash "$f"; done
 不需要手动打 tag；同一个版本重复 push 只会产出开发构建产物，不会刷屏 Releases。
 细节（存储库清单怎么生成、如何回填历史版本的 Release 说明等）见 [CI.md](CI.md)。
 
-### 12.4 目录结构
+### 13.4 目录结构
 
 ```
 Jellyfin.Plugin.StrmTrickplay/
@@ -634,36 +712,3 @@ Jellyfin.Plugin.StrmTrickplay/
 │   └── IStrmProbeService.cs / ProbeModels.cs
 ├── Tasks/                                计划任务（重建索引、探测媒体信息）
 └── Trickplay/
-    ├── StrmTrickplayManager.cs           ★ 只覆盖读路径，其余透传
-    ├── SidecarTrickplayParser.cs         ★ 目录规范解析（与官方算法一致）
-    ├── SidecarTrickplayIndex.cs          索引 + 缓存 + 单飞锁
-    ├── HlsPlaylistBuilder.cs             trickplay m3u8 生成
-    └── ITrickplayGenerator.cs            生成器扩展点（预留）
-```
-
-### 12.5 相关文档
-
-| 文档 | 内容 |
-|---|---|
-| [CHANGELOG.md](CHANGELOG.md) | 每个版本改了什么；发版说明的唯一来源 |
-| [CI.md](CI.md) | 自动化构建与发版：触发规则、Release 附件、发版说明怎么写、本地复现 |
-| [TEST-REPORT.md](TEST-REPORT.md) | 在真实 Jellyfin 12.2.0 上的实测记录（命令与原始输出） |
-| [PLAN.md](PLAN.md) | 方案设计与源码级依据 |
-
----
-
-## 13. 许可证与致谢
-
-本项目以 **MIT** 许可发布，见 [LICENSE](LICENSE)。
-
-- **[Jellyfin](https://github.com/jellyfin/jellyfin)**：本插件的所有行为都以 12.2 的核心实现为准（`ITrickplayManager` / `IMediaSourceManager` / `ProbeProvider`），
-  文中引用的行号均来自该版本源码；
-- **[JellySTRMprobe](https://github.com/firestaerter3/JellySTRMprobe)**（GPL-3.0）：证明了"用 `EnableRemoteContentProbe` 刷新 strm 条目"这条路可行；
-  本插件按该思路**独立实现**（未复制其代码）；
-- **[StrmTool-Jellyfin](https://github.com/jinlin-teck/StrmTool-Jellyfin)**：同样用 `IMediaSourceManager` 装饰器处理 strm 播放路径，
-  本插件的起播加速按同一思路**独立实现**；
-- 感谢所有在 issue / 讨论里反馈网盘直链与 trickplay 兼容性问题的使用者。
-
----
-
-**如果这个插件帮到了你，欢迎 Star ⭐ 或把使用体验反馈到 [Issues](https://github.com/tang-bai/strm-trickplay/issues)。**

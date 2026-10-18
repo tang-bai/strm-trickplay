@@ -5,12 +5,15 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.StrmTrickplay.Probe;
+using Jellyfin.Plugin.StrmTrickplay.Subtitles;
 using Jellyfin.Plugin.StrmTrickplay.Tasks;
 using Jellyfin.Plugin.StrmTrickplay.Trickplay;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Persistence;
+using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -36,6 +39,8 @@ public sealed class StrmTrickplayController : ControllerBase
     private readonly SidecarTrickplayParser _parser;
     private readonly IApplicationPaths _applicationPaths;
     private readonly IStrmProbeService _probeService;
+    private readonly IStrmSubtitleService _subtitleService;
+    private readonly IMediaStreamRepository _mediaStreamRepository;
     private readonly ITaskManager _taskManager;
 
     /// <summary>
@@ -47,6 +52,8 @@ public sealed class StrmTrickplayController : ControllerBase
         SidecarTrickplayParser parser,
         IApplicationPaths applicationPaths,
         IStrmProbeService probeService,
+        IStrmSubtitleService subtitleService,
+        IMediaStreamRepository mediaStreamRepository,
         ITaskManager taskManager)
     {
         _libraryManager = libraryManager;
@@ -54,6 +61,8 @@ public sealed class StrmTrickplayController : ControllerBase
         _parser = parser;
         _applicationPaths = applicationPaths;
         _probeService = probeService;
+        _subtitleService = subtitleService;
+        _mediaStreamRepository = mediaStreamRepository;
         _taskManager = taskManager;
     }
 
@@ -87,6 +96,14 @@ public sealed class StrmTrickplayController : ControllerBase
             {
                 enabled = config.EnableFastStartup,
                 description = "媒体信息已完整的 .strm 在起播时跳过核心强制的远端探测"
+            },
+            sidecarSubtitles = new
+            {
+                enabled = config.EnableSidecarSubtitles,
+                folders = config.SubtitleAdditionalFolders,
+                languageFilter = config.SubtitleLanguageFilter,
+                defaultLanguage = config.SubtitleDefaultLanguage,
+                description = "扫描 .strm 同级目录的外挂字幕并挂载（核心对非 file 协议的 strm 不做这一步）"
             },
             mediaProbe = new
             {
@@ -394,6 +411,85 @@ public sealed class StrmTrickplayController : ControllerBase
         _index.Clear();
         _taskManager.QueueIfNotRunning<RefreshStrmTrickplayIndexTask>();
         return Ok(new { queued = true, task = "刷新 STRM Trickplay 索引" });
+    }
+
+    /// <summary>
+    /// 外挂字幕诊断：扫描到的字幕文件 + 当前已挂载的外挂字幕。
+    /// </summary>
+    /// <param name="itemId">Item id.</param>
+    /// <returns>Subtitle payload.</returns>
+    [HttpGet("Subtitles/{itemId}")]
+    public ActionResult GetSubtitles([FromRoute] Guid itemId)
+    {
+        var item = _libraryManager.GetItemById(itemId);
+        if (item is null)
+        {
+            return NotFound(new { error = "item not found" });
+        }
+
+        var config = Plugin.CurrentConfiguration;
+        var scanned = _subtitleService.Scan(item);
+        var mounted = (_mediaStreamRepository.GetMediaStreams(new MediaStreamQuery
+        {
+            ItemId = itemId,
+            Type = MediaStreamType.Subtitle
+        }) ?? []).ToList();
+
+        return Ok(new
+        {
+            itemId = itemId.ToString("N", CultureInfo.InvariantCulture),
+            name = item.Name,
+            handled = _subtitleService.IsHandled(item),
+            enabled = config.EnableSidecarSubtitles,
+            extraFolders = config.SubtitleAdditionalFolders,
+            languageFilter = config.SubtitleLanguageFilter,
+            defaultLanguage = config.SubtitleDefaultLanguage,
+            discovered = scanned.Select(s => new { path = s.Path, codec = s.Codec, language = s.Language, title = s.Title, isForced = s.IsForced, isHearingImpaired = s.IsHearingImpaired }),
+            mounted = mounted.Select(s => new { index = s.Index, codec = s.Codec, language = s.Language, title = s.Title, isExternal = s.IsExternal, isDefault = s.IsDefault, isForced = s.IsForced, path = s.Path }),
+            externalCount = mounted.Count(s => s.IsExternal)
+        });
+    }
+
+    /// <summary>
+    /// 立即为单个条目扫描并挂载外挂字幕。
+    /// </summary>
+    /// <param name="itemId">Item id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Attach result.</returns>
+    [HttpPost("Subtitles/{itemId}/Scan")]
+    public async Task<ActionResult> ScanSubtitles([FromRoute] Guid itemId, CancellationToken cancellationToken)
+    {
+        var item = _libraryManager.GetItemById(itemId);
+        if (item is null)
+        {
+            return NotFound(new { error = "item not found" });
+        }
+
+        var result = await _subtitleService.AttachAsync(item, cancellationToken).ConfigureAwait(false);
+
+        return Ok(new
+        {
+            itemId = itemId.ToString("N", CultureInfo.InvariantCulture),
+            handled = _subtitleService.IsHandled(item),
+            discovered = result.Discovered,
+            mounted = result.Added,
+            removed = result.Removed,
+            totalExternal = result.TotalExternal,
+            hint = result.Discovered == 0
+                ? "没有匹配到字幕文件：确认文件名以媒体主文件名开头（如 影片.chs.ass），或把字幕放到配置里的额外目录"
+                : "已挂载；客户端字幕菜单里即可选择（ASS 由 Jellyfin 按客户端能力转换或直传）"
+        });
+    }
+
+    /// <summary>
+    /// 把「扫描 STRM 外挂字幕」计划任务排入队列（立即后台执行）。
+    /// </summary>
+    /// <returns>Queued flag.</returns>
+    [HttpPost("Subtitles/Run")]
+    public ActionResult QueueSubtitleScan()
+    {
+        _taskManager.QueueIfNotRunning<ScanStrmSubtitlesTask>();
+        return Ok(new { queued = true, task = "扫描 STRM 外挂字幕" });
     }
 
     private static bool SafeExists(string path)

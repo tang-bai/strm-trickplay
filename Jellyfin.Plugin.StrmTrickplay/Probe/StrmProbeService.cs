@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.StrmTrickplay.Subtitles;
 using Jellyfin.Plugin.StrmTrickplay.Trickplay;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
@@ -32,6 +33,7 @@ public sealed class StrmProbeService : IStrmProbeService
     private readonly IMediaSourceManager _mediaSourceManager;
     private readonly IDirectoryService _directoryService;
     private readonly ISidecarTrickplayIndex _trickplayIndex;
+    private readonly IStrmSubtitleService _subtitleService;
     private readonly ILogger<StrmProbeService> _logger;
 
     private readonly ConcurrentQueue<BaseItem> _catchUpQueue = new();
@@ -46,6 +48,7 @@ public sealed class StrmProbeService : IStrmProbeService
         IMediaSourceManager mediaSourceManager,
         IDirectoryService directoryService,
         ISidecarTrickplayIndex trickplayIndex,
+        IStrmSubtitleService subtitleService,
         ILogger<StrmProbeService> logger)
     {
         _providerManager = providerManager;
@@ -53,6 +56,7 @@ public sealed class StrmProbeService : IStrmProbeService
         _mediaSourceManager = mediaSourceManager;
         _directoryService = directoryService;
         _trickplayIndex = trickplayIndex;
+        _subtitleService = subtitleService;
         _logger = logger;
     }
 
@@ -221,6 +225,16 @@ public sealed class StrmProbeService : IStrmProbeService
 
         // 探测成功后让 trickplay 索引重算：拿到时长后，缩略图间隔就能按官方算法精确推断
         _trickplayIndex.Invalidate(item.Id);
+
+        // 顺带挂载同级目录的外挂字幕（核心对非 file 协议的 strm 不做这一步）
+        try
+        {
+            await _subtitleService.AttachAsync(item, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "[StrmTrickplay] 探测后挂载外挂字幕失败: {Path}", item.Path);
+        }
 
         var streamsAfter = _mediaSourceManager.GetMediaStreams(item.Id).Count;
         var runtimeAfter = item.RunTimeTicks;
