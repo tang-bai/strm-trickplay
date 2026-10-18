@@ -2,6 +2,18 @@
 
 ![STRM Trickplay 封面](thumb.png)
 
+<p align="center">
+  <a href="https://github.com/tang-bai/strm-trickplay/releases"><img alt="Release" src="https://img.shields.io/github/v/release/tang-bai/strm-trickplay?display_name=tag&amp;sort=semver"></a>
+  <a href="https://github.com/tang-bai/strm-trickplay/actions"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/tang-bai/strm-trickplay/build.yml?branch=main"></a>
+  <a href="https://github.com/tang-bai/strm-trickplay/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/tang-bai/strm-trickplay/total"></a>
+  <a href="https://jellyfin.org"><img alt="Jellyfin 12.2.x" src="https://img.shields.io/badge/Jellyfin-12.2.x-00A4DC?logo=jellyfin&amp;logoColor=white"></a>
+  <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&amp;logoColor=white">
+  <img alt="ASS 字幕支持" src="https://img.shields.io/badge/ASS%20%E5%AD%97%E5%B9%95-%E6%94%AF%E6%8C%81-AA5CC3">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/tang-bai/strm-trickplay"></a>
+  <a href="https://github.com/tang-bai/strm-trickplay/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/tang-bai/strm-trickplay"></a>
+  <a href="https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/manifest.json"><img alt="Jellyfin 插件存储库" src="https://img.shields.io/badge/Jellyfin-%E6%8F%92%E4%BB%B6%E5%AD%98%E5%82%A8%E5%BA%93-00A4DC?logo=jellyfin&amp;logoColor=white"></a>
+</p>
+
 **让 Jellyfin 里的 `.strm`（网盘 / 远端直链）条目也能拥有进度条缩略图预览，并顺带补齐媒体信息、加快起播。**
 
 | 项目 | 值 |
