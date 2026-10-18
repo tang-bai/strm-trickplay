@@ -9,6 +9,16 @@
     "imageUrl": "https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/thumb.png",
     "versions": [
       {
+        "version": "0.6.0.0",
+        "changelog": "新增能力④ 外挂字幕（含 ASS）：插件扫描 .strm 同级目录并把字幕挂到条目上",
+        "targetAbi": "12.2.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/tang-bai/strm-trickplay/main/docs/strm-trickplay_0.6.0.0.zip",
+        "checksum": "EF55D912970F07F624F8EDD6C7BDC847",
+        "timestamp": "2026-10-18T13:58:58.7350040Z",
+        "repositoryName": "STRM Trickplay",
+        "repositoryUrl": "https://github.com/tang-bai/strm-trickplay"
+      },
+      {
         "version": "0.5.5.0",
         "changelog": "新增插件封面图：Jellyfin 插件目录里会显示缩略图，README 顶部也放上",
         "targetAbi": "12.2.0.0",
